@@ -3,8 +3,10 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'latest.json');
+
+fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
 
 app.use(express.text({ limit: '20mb' }));
 app.use(express.json({ limit: '20mb' }));

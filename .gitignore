@@ -1,3 +1,4 @@
 node_modules/
 data/browser-profile/
 data/session.json
+data/latest.json
