@@ -1,0 +1,150 @@
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+
+const app = express();
+const PORT = 3000;
+const DATA_FILE = path.join(__dirname, 'data', 'latest.json');
+
+app.use(express.text({ limit: '20mb' }));
+app.use(express.json({ limit: '20mb' }));
+app.use(express.static(path.join(__dirname, 'portal')));
+
+// Load saved data on startup
+let latestData = null;
+if (fs.existsSync(DATA_FILE)) {
+  try {
+    latestData = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+    console.log(`📦 נטענו נתונים מ-${latestData.updatedAt}`);
+  } catch(e) {}
+}
+
+// ── GET /api/data — portal reads this on startup
+app.get('/api/data', (req, res) => {
+  if (!latestData) return res.json({ empty: true });
+  res.json(latestData);
+});
+
+// ── POST /api/update — refresh.js posts CSV here
+app.post('/api/update', (req, res) => {
+  const csv = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+  const coords = parseCSV(csv);
+  if (!coords) return res.status(400).json({ error: 'parse failed' });
+
+  latestData = {
+    updatedAt: new Date().toISOString(),
+    coords,
+  };
+  fs.writeFileSync(DATA_FILE, JSON.stringify(latestData, null, 2));
+  console.log(`✅ עודכן — ${coords.length} רכזים, ${coords.reduce((s,c)=>s+c.orders.length,0)} הזמנות`);
+  res.json({ ok: true, coordCount: coords.length });
+});
+
+app.listen(PORT, () => {
+  console.log(`\n🌿 פופ ישראל — שרת פעיל`);
+  console.log(`   פורטל: http://localhost:${PORT}`);
+  console.log(`   עדכון אחרון: ${latestData?.updatedAt || 'אין עדיין'}\n`);
+});
+
+// ══════════════════════════════════════════════
+// CSV Parser (same logic as pop-portal-v5.jsx)
+// ══════════════════════════════════════════════
+function parseLine(line, d) {
+  const r = []; let cur = '', inQ = false;
+  for (const c of line) {
+    if (c === '"') { inQ = !inQ; continue; }
+    if (c === d && !inQ) { r.push(cur); cur = ''; continue; }
+    cur += c;
+  }
+  r.push(cur);
+  return r;
+}
+
+function findCol(h, opts) {
+  for (const o of opts) {
+    const i = h.findIndex(x => x.includes(o));
+    if (i >= 0) return i;
+  }
+  return -1;
+}
+
+function slugify(s = '') { return s.trim().replace(/\s+/g, '-'); }
+
+function cleanPhone(p) {
+  if (!p) return '';
+  let s = String(p).replace(/\D/g, '');
+  if (s.length === 9 && s[0] === '5') s = '0' + s;
+  return s;
+}
+
+function parseItems(str) {
+  return str.split('\n')
+    .map(l => l.replace(/🛈\s*/g, '').trim())
+    .filter(l => l)
+    .map(l => {
+      const m = l.match(/^(\d+)\s+([^-]+)-\s*(.+)$/);
+      if (m) return { qty: parseInt(m[1]), unit: m[2].trim(), name: m[3].trim() };
+      return { qty: 1, unit: '', name: l };
+    });
+}
+
+function parseDelivery(str) {
+  const pm = str.match(/0\d[\-\s]?\d{3}[\-\s]?\d{4}/);
+  const cp = pm ? pm[0] : '';
+  let city = '', rest = str;
+  const di = str.indexOf(' - ');
+  if (di > 0) { city = str.slice(0, di).trim(); rest = str.slice(di + 3).trim(); }
+  let cn = rest;
+  if (cp) cn = rest.replace(cp, '').trim();
+  cn = cn.split(',').pop().trim().replace(/\s+\d.*$/, '').trim();
+  return { city, coordName: cn, coordPhone: cp };
+}
+
+function splitCSVRows(text) {
+  const rows = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') { inQ = !inQ; cur += ch; }
+    else if (!inQ && (ch === '\n')) { rows.push(cur); cur = ''; }
+    else { cur += ch; }
+  }
+  if (cur.trim()) rows.push(cur);
+  return rows;
+}
+
+function parseCSV(text) {
+  const lines = splitCSVRows(text).filter(l => l.trim());
+  if (lines.length < 2) return null;
+  const d = lines[0].includes('\t') ? '\t' : ',';
+  const hdr = parseLine(lines[0], d).map(h => h.replace(/^﻿/, '').replace(/"/g,'').trim());
+
+  const iD = findCol(hdr, ['אפשרות אספקה / משלוח', 'אפשרות אספקה', 'משלוח']);
+  const iN = findCol(hdr, ['שם לקוח', 'שם', 'name']);
+  const iP = findCol(hdr, ['טלפון', 'phone', 'נייד']);
+  const iT = findCol(hdr, ['סהכ לתשלום', 'סה"כ לתשלום', 'סה"כ', 'total', 'סכום']);
+  const iR = findCol(hdr, ['הזמנה ראשונה']);
+  const iI = hdr.findIndex(h => h === 'רשימת פריטים' || (h.includes('רשימת פריטים') && !h.includes('חסרים')));
+
+  if (iD < 0) return null;
+
+  const byD = {};
+  for (let i = 1; i < lines.length; i++) {
+    const c = parseLine(lines[i], d);
+    const dv = (c[iD] || '').trim();
+    if (!dv) continue;
+    if (!byD[dv]) byD[dv] = [];
+    byD[dv].push({
+      name: iN >= 0 ? (c[iN] || '').trim() : '',
+      phone: iP >= 0 ? cleanPhone(c[iP]) : '',
+      total: iT >= 0 ? parseFloat((c[iT] || '0').replace(/[^\d.]/g, '')) || 0 : 0,
+      returning: iR >= 0 ? !(c[iR] || '').trim() : false,
+      items: iI >= 0 ? parseItems(c[iI] || '') : [],
+    });
+  }
+
+  return Object.entries(byD).map(([key, orders]) => {
+    const p = parseDelivery(key);
+    return { ...p, coordKey: slugify(p.coordName || key), deliveryStr: key, orders };
+  });
+}

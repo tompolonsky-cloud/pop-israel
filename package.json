@@ -1,0 +1,14 @@
+{
+  "name": "pop-israel-system",
+  "version": "1.0.0",
+  "description": "Pop Israel coordinator portal + auto-refresh",
+  "scripts": {
+    "server": "node server.js",
+    "refresh": "node refresh.js",
+    "login": "node first-login.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "playwright": "^1.44.0"
+  }
+}

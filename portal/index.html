@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>פורטל פופ ישראל 🌿</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Heebo', sans-serif; background: #fefcf7; }
+  @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;900&display=swap');
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+// ══════════════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════════════
+const STORE_LINK_DEFAULT = "https://mypips.app/popisrael/private-sale/popolonski";
+const STORE_LINK_WED     = "https://mypips.link/popisrael/p/wed-center";
+const CS_PHONE           = "0555049028";
+const RAVIT_PHONE        = "0503232991";
+const GROUP_TARGET       = 60;
+
+function getStoreLink() {
+  return new Date().getDay() === 3 ? STORE_LINK_WED : STORE_LINK_DEFAULT;
+}
+
+function buildPilotMsg(coord, waGroupLink) {
+  const city  = coord.city || "האזור שלנו";
+  const name  = coord.coordName || "";
+  const phone = fmtPhone(coord.coordPhone || "");
+  const link  = waGroupLink || "";
+  return `פיילוט תוצרת מהחקלאי לצרכן מגיע ל${city}!
+
+יחד בוחרים מקומי, תומכים בחקלאים והיצרנים מהעוטף והצפון, ומחזירים טריות אמיתית הביתה.
+
+מה מחכה לכם:
+* ירקות ופירות שנקטפים ממש לפני שמגיעים אליכם
+* מגוון גדול - מעל 300 מוצרים שונים שמתחדשים ברמה שבועית
+* מחירים הוגנים, ללא פערי תיווך וללא רשתות באמצע
+* מוצרים ישראליים איכותיים – לחמים, שמנים, ממרחים ועוד
+* חיזוק הכלכלה המקומית מתוך ערבות הדדית ואהבה לאדמה 🇮🇱
+
+והכי כיף? אין דמי משלוח ואין מינימום הזמנה.
+
+הזמנות מהחנות הדיגיטלית: ימי ראשון ב-19:00 ועד חמישי ב-8:00
+${coord.deliveryStr ? coord.deliveryStr.split(" - ")[1] || city : city}
+${name}${phone ? " " + phone : ""}
+
+בכל שבוע יוזמנו מספר משתתפים, כדי לשמור על איכות וטריות שיא.
+
+רוצים להיכנס לתור ולהיות מהראשונים שיוזמנו? הצטרפו לרשימת המתעניינים:
+${link}`;
+}
+
+const FAQ = [
+  { q:"מתי מגיעה ההזמנה?",         a:"החלוקה בנקודת האיסוף שלך בשעה הקבועה. תקבל תזכורת מהרכז/ת יום לפני." },
+  { q:"איך מבטלים הזמנה?",          a:"ניתן לבטל עד יום ראשון בחצות בשבוע שלפני. פנה/י לרכז/ת שלך." },
+  { q:"מה אם פספסתי את החלוקה?",    a:"צור/י קשר עם הרכז/ת ישירות — לרוב אפשר לסדר איסוף חלופי." },
+  { q:"איך משלמים?",                 a:"ביט / העברה בנקאית / מזומן — לפי הסיכום עם הרכז/ת שלך." },
+  { q:"מה כלול בהזמנה?",            a:"ירקות עונתיים טריים ישירות מהחקלאי. הפירוט המדויק בחנות." },
+  { q:"יש מינימום הזמנה?",          a:"לא. ניתן להזמין כל כמות." },
+  { q:"איך מוסיפים חברים לקבוצה?", a:"שתף/י את לינק החנות — ברגע שמזמינים, הם נכנסים לקבוצה." },
+  { q:"מה אם המוצר לא תקין?",      a:"פנה/י לרכז/ת עם תמונה. פופ מטפלת ומחזירה כסף או מוצר." },
+];
+
+// ══════════════════════════════════════════════
+// STORAGE — localStorage
+// ══════════════════════════════════════════════
+function sto_set(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+}
+function sto_get(key) {
+  try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : null; } catch(e) { return null; }
+}
+const K_TIMES    = "pop_v6_times";
+const K_WEEK     = "pop_v6_week";
+const K_NOTIFS   = "pop_v6_notifs";
+const K_PROGRESS = "pop_v6_progress";
+const K_DRIVERS  = "pop_v6_drivers";
+const K_WALINKS  = "pop_v6_walinks";
+
+// ══════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════
+function slugify(s="") { return s.trim().replace(/\s+/g,"-"); }
+function fmtPhone(p) {
+  if(!p||p.length<9) return p||"";
+  if(p.startsWith("0")&&p.length===10) return `${p.slice(0,3)}-${p.slice(3,6)}-${p.slice(6)}`;
+  return p;
+}
+function waLink(phone, msg="") {
+  const n=phone.replace(/^0/,"972");
+  return `https://wa.me/${n}${msg?`?text=${encodeURIComponent(msg)}`:""}`;
+}
+
+// ══════════════════════════════════════════════
+// MESSAGE BUILDERS
+// ══════════════════════════════════════════════
+function buildStoreOpen(coord, time, weekNum) {
+  const link=getStoreLink();
+  return `🔔 *החנות נפתחה!*\nשבוע ${weekNum} | פופ ישראל 🌿\n\nהירקות הגיעו מהחקלאי — הזמינו עכשיו:\n${link}\n\nחלוקה אצל ${coord.coordName} — *${time}*`;
+}
+function buildGroupAnnounce(coord, time, weekNum) {
+  const link=getStoreLink();
+  return `🌿 *פופ ישראל | שבוע ${weekNum}*\n\nהחנות פתוחה! הזמנות עד יום ראשון בחצות 🌙\n\n👇 להזמנה:\n${link}\n\nחלוקה ${coord.city?"ב"+coord.city:"אצלנו"} — *${time}*\n\nרוצה להמליץ לחבר/ה? שתף/י את הלינק 💚\nיחד נגדל את הקבוצה שלנו!`;
+}
+function buildPersonalMsg(order, coord, time) {
+  return `שלום ${order.name}! 🌿\nהזמנתך אצל ${coord.coordName} מאושרת.\nחלוקה ${time} ב${coord.city||coord.deliveryStr}.${order.total?`\nסכום לתשלום: ₪${order.total}`:""}\nשאלות? ${fmtPhone(CS_PHONE)} 📞`;
+}
+
+// ══════════════════════════════════════════════
+// APP
+// ══════════════════════════════════════════════
+function App() {
+  const [view,      setView]     = useState("loading");
+  const [coords,    setCoords]   = useState([]);
+  const [updatedAt, setUpdatedAt]= useState(null);
+  const [times,     setTimes]    = useState({});
+  const [drivers,   setDrivers]  = useState({});
+  const [waLinks,   setWaLinks]  = useState({});
+  const [week,      setWeek]     = useState({num:1,label:"שבוע 1",openedAt:null});
+  const [notifs,    setNotifs]   = useState([]);
+  const [progress,  setProgress] = useState([]);
+  const [selCoord,  setSelCoord] = useState(null);
+  const [tab,       setTab]      = useState("orders");
+  const [toast,     setToast]    = useState("");
+  const [coordParam,setCoordParam]=useState(null);
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    let cp = null;
+    if (hash.startsWith("#coord=")) cp = decodeURIComponent(hash.slice(7));
+    setCoordParam(cp);
+    init(cp);
+  }, []);
+
+  async function init(cp) {
+    setView("loading");
+    // Load settings from localStorage
+    const t  = sto_get(K_TIMES);
+    const w  = sto_get(K_WEEK);
+    const n  = sto_get(K_NOTIFS);
+    const p  = sto_get(K_PROGRESS);
+    const dr = sto_get(K_DRIVERS);
+    const wl = sto_get(K_WALINKS);
+    if(t)  setTimes(t);
+    if(w)  setWeek(w);
+    if(n)  setNotifs(n);
+    if(p)  setProgress(p);
+    if(dr) setDrivers(dr);
+    if(wl) setWaLinks(wl);
+
+    // Fetch latest data from server
+    try {
+      const res  = await fetch('/api/data');
+      const data = await res.json();
+      if (data.coords && data.coords.length > 0) {
+        setCoords(data.coords);
+        setUpdatedAt(data.updatedAt);
+        if (cp) {
+          const found = data.coords.find(x => slugify(x.coordName)===slugify(cp) || x.coordKey===cp);
+          if (found) { setSelCoord(found); setView("coord"); return; }
+          setView("error"); return;
+        }
+        setView("admin");
+        return;
+      }
+    } catch(e) {}
+
+    setView(cp ? "error" : "empty");
+  }
+
+  function showToast(msg,dur=3000){setToast(msg);setTimeout(()=>setToast(""),dur);}
+
+  async function saveTimes(t)  { setTimes(t);   sto_set(K_TIMES,t);   showToast("✅ שעות נשמרו"); }
+  async function saveDrivers(dr){ setDrivers(dr); sto_set(K_DRIVERS,dr); showToast("✅ נהגים נשמרו"); }
+  async function saveWaLinks(wl){ setWaLinks(wl); sto_set(K_WALINKS,wl); showToast("✅ לינקי קבוצה נשמרו"); }
+
+  async function fireNotif(coord) {
+    const t=times[coord.coordKey]||"17:00";
+    const msg=buildStoreOpen(coord,t,week.num);
+    const newN=[{ts:Date.now(),coordKey:coord.coordKey,coordName:coord.coordName,week:week.num},...(notifs||[])].slice(0,50);
+    const newWeek={...week,openedAt:Date.now()};
+    setNotifs(newN); setWeek(newWeek);
+    sto_set(K_NOTIFS,newN); sto_set(K_WEEK,newWeek);
+    navigator.clipboard.writeText(msg).then(()=>showToast("🔔 הודעת פתיחה הועתקה — הדבק בקבוצה!"));
+  }
+
+  async function updateMembers(weekNum,val){
+    const newP=(progress||[]).map(p=>p.week===weekNum?{...p,members:val}:p);
+    setProgress(newP); sto_set(K_PROGRESS,newP);
+  }
+
+  function coordLink(c){return`${window.location.origin}${window.location.pathname}#coord=${encodeURIComponent(slugify(c.coordName))}`;}
+  function copyCoordLink(c){navigator.clipboard.writeText(coordLink(c)).then(()=>showToast(`📋 לינק ${c.coordName} הועתק`));}
+  function sendCoordWA(c){window.open(`https://wa.me/?text=${encodeURIComponent(`היי ${c.coordName}! 🌿\nהנה הפורטל שלך:\n${coordLink(c)}`)}`); }
+
+  if(view==="loading") return <Screen><Centered><Spinner/><Muted>טוען...</Muted></Centered></Screen>;
+  if(view==="error")   return <Screen><Centered><div style={{fontSize:48}}>⚠️</div><p style={{color:"#e63946",fontWeight:700,textAlign:"center"}}>לא נמצאת. בקש לינק מעודכן.</p></Centered></Screen>;
+  if(view==="empty")   return (
+    <Screen>
+      <GreenHeader title="פופ ישראל 🌿" sub="פורטל רכזים"/>
+      <Body>
+        <Card style={{textAlign:"center",padding:"32px 20px"}}>
+          <div style={{fontSize:52,marginBottom:12}}>⏳</div>
+          <div style={{fontSize:18,fontWeight:800,color:"#1a3c2e",marginBottom:8}}>ממתין לנתונים ראשונים</div>
+          <p style={{fontSize:13,color:"#6b7280",lineHeight:1.6}}>
+            השרת פועל — הנתונים יגיעו בעדכון הבא<br/>
+            (08:00 / 13:00 / 19:00)
+          </p>
+          <button style={{...S.btn,marginTop:20,width:"auto",padding:"10px 24px"}} onClick={()=>init(coordParam)}>
+            🔄 רענן עכשיו
+          </button>
+        </Card>
+      </Body>
+    </Screen>
+  );
+
+  if(view==="admin") return <AdminScreen coords={coords} times={times} drivers={drivers} waLinks={waLinks} week={week}
+      notifs={notifs} progress={progress} updatedAt={updatedAt}
+      onSaveTimes={saveTimes} onSaveDrivers={saveDrivers} onSaveWaLinks={saveWaLinks} onFireNotif={fireNotif}
+      onCoordLink={copyCoordLink} onCoordWA={sendCoordWA}
+      onOpenCoord={c=>{setSelCoord(c);setTab("orders");setView("coord");}}
+      onUpdateMembers={updateMembers} toast={toast} showToast={showToast}/>;
+
+  if(view==="coord") return <CoordScreen coord={selCoord}
+      time={times[selCoord?.coordKey]||"17:00"}
+      driver={drivers[selCoord?.coordKey]||null}
+      waGroupLink={waLinks[selCoord?.coordKey]||""}
+      week={week} onBack={coordParam?null:()=>setView("admin")}
+      updatedAt={updatedAt}
+      tab={tab} setTab={setTab} toast={toast} showToast={showToast}/>;
+
+  return null;
+}
+
+// ══════════════════════════════════════════════
+// ADMIN SCREEN
+// ══════════════════════════════════════════════
+function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedAt,onSaveTimes,onSaveDrivers,onSaveWaLinks,onFireNotif,onCoordLink,onCoordWA,onOpenCoord,onUpdateMembers,toast,showToast}) {
+  const [adTab,setAdTab]=useState("overview");
+  const [localTimes,setLocalTimes]=useState({...times});
+  const [localDrivers,setLocalDrivers]=useState({...drivers});
+  const [localWaLinks,setLocalWaLinks]=useState({...waLinks});
+  const [membersInput,setMembersInput]=useState({});
+
+  const totalOrders=coords.reduce((s,c)=>s+c.orders.length,0);
+  const totalRev=coords.reduce((s,c)=>s+c.orders.reduce((x,o)=>x+o.total,0),0);
+  const latestMembers=(progress||[]).filter(p=>p.members!=null).slice(-1)[0]?.members||0;
+  const membersPct=Math.min(100,Math.round((latestMembers/GROUP_TARGET)*100));
+  const storeOpen=week.openedAt&&(Date.now()-week.openedAt<7*24*3600*1000);
+
+  const updatedStr = updatedAt ? new Date(updatedAt).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}) : null;
+
+  function updDriver(key,field,val){
+    setLocalDrivers(prev=>({...prev,[key]:{...(prev[key]||{}), [field]:val}}));
+  }
+
+  return (
+    <Screen>
+      <GreenHeader title={week.label} sub={`${coords.length} רכזים · ${totalOrders} הזמנות`}>
+        {updatedStr&&<div style={{fontSize:10,opacity:.6,marginTop:4}}>עדכון אחרון: {updatedStr}</div>}
+      </GreenHeader>
+
+      <div style={{background:"#1a3c2e",display:"flex",borderBottom:"2px solid #2d6a4f",overflowX:"auto"}}>
+        {[["overview","📊"],["coords","👥"],["drivers","🚐"],["walinks","💬"],["progress","📈"]].map(([k,l])=>(
+          <div key={k} onClick={()=>setAdTab(k)} style={{flex:"0 0 auto",padding:"10px 14px",textAlign:"center",fontSize:18,color:adTab===k?"#ffd166":"rgba(255,255,255,.45)",borderBottom:adTab===k?"2px solid #ffd166":"2px solid transparent",cursor:"pointer",marginBottom:-2}}>
+            {l}
+          </div>
+        ))}
+      </div>
+
+      <Body>
+        {adTab==="overview" && <>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
+            {[[coords.length,"רכזים","🌿"],[totalOrders,"הזמנות","📋"],["₪"+totalRev.toLocaleString("he-IL"),"סה\"כ","💰"]].map(([v,l,ic])=>(
+              <div key={l} style={S.statBox}><div style={{fontSize:18,marginBottom:3}}>{ic}</div><div style={S.statVal}>{v}</div><div style={S.statLbl}>{l}</div></div>
+            ))}
+          </div>
+
+          <Card style={{borderRight:storeOpen?"4px solid #16a34a":"4px solid #2d6a4f"}}>
+            <p style={{...T.cardTitle,marginBottom:6}}>{storeOpen?"✅ החנות פתוחה השבוע":"🔔 פתח חנות"}</p>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {coords.map(c=>(
+                <button key={c.coordKey} onClick={()=>onFireNotif(c)}
+                  style={{...S.btnSmall,background:"#1a3c2e",display:"flex",alignItems:"center",gap:8,justifyContent:"flex-start",textAlign:"right",padding:"10px 14px"}}>
+                  <span>🔔</span>
+                  <span style={{flex:1}}>{c.coordName} — {c.city}</span>
+                  <span style={{fontSize:10,opacity:.7}}>{c.orders.length} מזמינים</span>
+                </button>
+              ))}
+            </div>
+          </Card>
+
+          <Card>
+            <p style={{...T.cardTitle,marginBottom:10}}>🎯 יעד קבוצה — {GROUP_TARGET} חברים</p>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+              <div style={{flex:1,background:"#e8ede9",borderRadius:99,height:12,overflow:"hidden"}}>
+                <div style={{width:membersPct+"%",height:"100%",background:"linear-gradient(90deg,#2d6a4f,#52b788)",borderRadius:99,transition:"width 1s"}}/>
+              </div>
+              <span style={{fontSize:14,fontWeight:900,color:"#2d6a4f",minWidth:38}}>{membersPct}%</span>
+            </div>
+          </Card>
+        </>}
+
+        {adTab==="coords" && <>
+          <Card>
+            <p style={{...T.cardTitle,marginBottom:14}}>🔗 לינקים אישיים</p>
+            {coords.map(c=>(
+              <div key={c.coordKey} style={{padding:"11px 0",borderBottom:"1px solid #e8ede9"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:14}}>{c.coordName}</div>
+                    <div style={{fontSize:11,color:"#6b7280"}}>{c.city} · {c.orders.length} מזמינים</div>
+                  </div>
+                  <button style={S.iconBtn} onClick={()=>onCoordLink(c)}>📋</button>
+                  <button style={{...S.iconBtn,background:"#dcfce7"}} onClick={()=>onCoordWA(c)}>💬</button>
+                  <button style={{...S.iconBtn,background:"#dbeafe"}} onClick={()=>onOpenCoord(c)}>👁️</button>
+                  <button style={{...S.iconBtn,background:"#fef3c7"}} onClick={()=>onFireNotif(c)}>🔔</button>
+                </div>
+              </div>
+            ))}
+          </Card>
+          <Card>
+            <p style={{...T.cardTitle,marginBottom:14}}>⏰ שעות חלוקה</p>
+            {coords.map(c=>(
+              <div key={c.coordKey} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #e8ede9"}}>
+                <div style={{flex:1,fontSize:13,fontWeight:600}}>{c.coordName} <span style={{color:"#6b7280",fontWeight:400}}>— {c.city}</span></div>
+                <input type="time" value={localTimes[c.coordKey]||"17:00"}
+                  onChange={e=>setLocalTimes({...localTimes,[c.coordKey]:e.target.value})}
+                  style={{border:"1.5px solid #d1fae5",borderRadius:8,padding:"5px 8px",fontSize:13,fontFamily:"Heebo,sans-serif",color:"#1a3c2e"}}/>
+              </div>
+            ))}
+            <button style={{...S.btn,marginTop:14}} onClick={()=>onSaveTimes(localTimes)}>💾 שמור שעות</button>
+          </Card>
+        </>}
+
+        {adTab==="drivers" && <>
+          <Card>
+            <p style={{...T.cardTitle,marginBottom:6}}>🚐 נהגים</p>
+            {coords.map(c=>{
+              const d=localDrivers[c.coordKey]||{};
+              return (
+                <div key={c.coordKey} style={{padding:"12px 0",borderBottom:"1px solid #e8ede9"}}>
+                  <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>{c.coordName} <span style={{color:"#6b7280",fontWeight:400,fontSize:12}}>— {c.city}</span></div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    <input value={d.name||""} onChange={e=>updDriver(c.coordKey,"name",e.target.value)} placeholder="שם הנהג" style={S.input}/>
+                    <input value={d.phone||""} onChange={e=>updDriver(c.coordKey,"phone",e.target.value)} placeholder="05X-XXX-XXXX" style={S.input} type="tel"/>
+                  </div>
+                </div>
+              );
+            })}
+            <button style={{...S.btn,marginTop:14}} onClick={()=>onSaveDrivers(localDrivers)}>💾 שמור נהגים</button>
+          </Card>
+        </>}
+
+        {adTab==="walinks" && <>
+          <Card>
+            <p style={{...T.cardTitle,marginBottom:6}}>💬 לינקי קבוצת וואטסאפ</p>
+            {coords.map(c=>(
+              <div key={c.coordKey} style={{padding:"10px 0",borderBottom:"1px solid #e8ede9"}}>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>{c.coordName} <span style={{color:"#6b7280",fontWeight:400}}>— {c.city}</span></div>
+                <input value={localWaLinks[c.coordKey]||""} onChange={e=>setLocalWaLinks({...localWaLinks,[c.coordKey]:e.target.value})}
+                  placeholder="https://chat.whatsapp.com/..." style={{...S.input,fontSize:12,direction:"ltr"}}/>
+              </div>
+            ))}
+            <button style={{...S.btn,marginTop:14}} onClick={()=>onSaveWaLinks(localWaLinks)}>💾 שמור לינקים</button>
+          </Card>
+        </>}
+
+        {adTab==="progress" && <>
+          <Card>
+            <p style={{...T.cardTitle,marginBottom:16}}>📈 פיילוט 4 שבועות</p>
+            {[1,2,3,4].map(wn=>{
+              const pw=(progress||[]).find(p=>p.week===wn);
+              const isCurrent=wn===week.num;
+              return (
+                <div key={wn} style={{padding:"12px 0",borderBottom:"1px solid #e8ede9"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:isCurrent?8:0}}>
+                    <div style={{...S.stepNum,background:pw?"#2d6a4f":"#d1d5db"}}>{wn}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:700,color:pw?"#1a3c2e":"#9ca3af"}}>שבוע {wn} {isCurrent?"← נוכחי":""}</div>
+                      {pw&&<div style={{fontSize:11,color:"#6b7280"}}>{pw.orders} הזמנות{pw.members!=null?` · ${pw.members} חברים`:""}</div>}
+                    </div>
+                    {isCurrent&&<div style={{background:"#dcfce7",color:"#166534",fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:99}}>פעיל</div>}
+                  </div>
+                  {isCurrent&&<div style={{display:"flex",gap:8}}>
+                    <input type="number" placeholder="כמה חברים בקבוצה?" min={0}
+                      value={membersInput[wn]||""}
+                      onChange={e=>setMembersInput({...membersInput,[wn]:e.target.value})}
+                      style={{...S.input,flex:1}}/>
+                    <button style={S.btnSmall} onClick={()=>onUpdateMembers(wn,parseInt(membersInput[wn])||0)}>✅</button>
+                  </div>}
+                </div>
+              );
+            })}
+          </Card>
+        </>}
+      </Body>
+      <Toast msg={toast}/>
+    </Screen>
+  );
+}
+
+// ══════════════════════════════════════════════
+// COORDINATOR SCREEN — same as v5
+// ══════════════════════════════════════════════
+function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast,showToast,updatedAt}) {
+  if(!coord) return null;
+  const totalRev=coord.orders.reduce((s,o)=>s+o.total,0);
+  const orderCount=coord.orders.length;
+  const MIN_ORDERS=5;
+  const belowMin=orderCount<MIN_ORDERS;
+  const missing=MIN_ORDERS-orderCount;
+
+  useEffect(()=>{
+    if(belowMin&&typeof Notification!=="undefined"&&Notification.permission==="granted"){
+      const key=`pop_alerted_${coord.coordKey}_${week?.num}`;
+      if(!sessionStorage.getItem(key)){
+        sessionStorage.setItem(key,"1");
+        setTimeout(()=>{
+          new Notification(`⚠️ ${coord.coordName} — רק ${orderCount} הזמנות!`,{body:`צריך עוד ${missing} הזמנות 💬`});
+        },2000);
+      }
+    }
+  },[]);
+
+  const boostMsg=`חברים, יש לנו ${orderCount} הזמנות השבוע — אנחנו צריכים לפחות ${MIN_ORDERS} כדי שהחלוקה תגיע אלינו! 🥺\n\nמי שעוד לא הזמין — זה הרגע! ⏰\n${getStoreLink()}\n\nומי שיכול להמליץ לשכן/ה — תעשו טוב 🙏\nיחד נגיע ליעד! 🌿`;
+
+  return (
+    <Screen>
+      <div style={{background:belowMin?"linear-gradient(155deg,#7f1d1d,#b91c1c)":"linear-gradient(155deg,#1a3c2e,#2d6a4f)",color:"#fff",padding:"20px 20px 24px",transition:"background .4s"}}>
+        {onBack&&<div onClick={onBack} style={{fontSize:12,opacity:.7,cursor:"pointer",marginBottom:10,display:"flex",alignItems:"center",gap:4}}>← חזרה</div>}
+        <div style={{fontSize:24,fontWeight:900}}>שלום {coord.coordName}! {belowMin?"⚠️":"🌿"}</div>
+        <div style={{fontSize:13,opacity:.7,marginTop:2}}>📍 {coord.city||coord.deliveryStr}</div>
+        <div style={{background:"rgba(255,255,255,.12)",borderRadius:12,padding:"12px 14px",marginTop:14,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:26}}>🕐</span>
+            <div><div style={{fontSize:10,opacity:.7}}>חלוקה היום</div><div style={{fontSize:22,fontWeight:900,color:"#ffd166"}}>{time}</div></div>
+          </div>
+          {driver?.phone&&(
+            <a href={`tel:${driver.phone}`} style={{background:"rgba(255,255,255,.15)",borderRadius:10,padding:"8px 12px",color:"#fff",textDecoration:"none",textAlign:"center"}}>
+              <div style={{fontSize:18}}>🚐</div>
+              <div style={{fontSize:10,opacity:.8}}>{driver.name||"נהג"}</div>
+              <div style={{fontSize:11,fontWeight:700,color:"#ffd166"}}>{fmtPhone(driver.phone)}</div>
+            </a>
+          )}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:12}}>
+          <div style={{background:belowMin?"rgba(239,68,68,.35)":"rgba(255,255,255,.11)",borderRadius:10,padding:"10px",textAlign:"center",border:belowMin?"2px solid rgba(252,165,165,.6)":"2px solid transparent"}}>
+            <div style={{fontSize:20,fontWeight:900,color:belowMin?"#fca5a5":"#ffd166"}}>{orderCount}</div>
+            <div style={{fontSize:10,opacity:.8}}>מזמינים {belowMin?`(חסרים ${missing})`:""}</div>
+          </div>
+          <div style={{background:"rgba(255,255,255,.11)",borderRadius:10,padding:"10px",textAlign:"center"}}>
+            <div style={{fontSize:20,fontWeight:900,color:"#ffd166"}}>{"₪"+totalRev.toLocaleString("he-IL")}</div>
+            <div style={{fontSize:10,opacity:.7}}>לגבייה</div>
+          </div>
+        </div>
+        <div style={{marginTop:10,fontSize:10,opacity:.5,textAlign:"center"}}>
+          {updatedAt&&<span>עודכן {new Date(updatedAt).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})} · </span>}
+          <span>מתעדכן בכל יום ב-08:00, 13:00, 19:00</span>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:12}}>
+        </div>
+        <div style={{marginTop:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:4}}>
+            <span>התקדמות לחלוקה</span><span>{orderCount} / {MIN_ORDERS} מינימום</span>
+          </div>
+          <div style={{background:"rgba(255,255,255,.2)",borderRadius:99,height:8}}>
+            <div style={{width:Math.min(100,(orderCount/MIN_ORDERS)*100)+"%",height:"100%",background:belowMin?"#fca5a5":"#86efac",borderRadius:99,transition:"width .5s"}}/>
+          </div>
+        </div>
+      </div>
+
+      {belowMin&&(
+        <div style={{background:"#fef2f2",border:"1.5px solid #fca5a5",margin:"12px 14px 0",borderRadius:12,padding:"14px"}}>
+          <p style={{fontSize:14,fontWeight:800,color:"#991b1b",marginBottom:6}}>⚠️ סכנה — החלוקה עלולה לא להגיע!</p>
+          <p style={{fontSize:12,color:"#7f1d1d",lineHeight:1.6,marginBottom:12}}>
+            יש לך {orderCount} הזמנות. צריך לפחות {MIN_ORDERS}.<br/><strong>שלח/י עכשיו לקבוצה:</strong>
+          </p>
+          <CopyBtnSimple text={boostMsg} label="📋 העתק הודעת דחיפה"/>
+          {waGroupLink&&<a href={waGroupLink} target="_blank" style={{display:"block",marginTop:8,background:"#25d366",color:"#fff",padding:"9px",borderRadius:9,textAlign:"center",textDecoration:"none",fontWeight:700,fontSize:13}}>
+            💬 פתח קבוצה ושלח
+          </a>}
+        </div>
+      )}
+
+      <div style={{background:"#fff",borderBottom:"1px solid #e8ede9",display:"flex",marginTop:belowMin?12:0}}>
+        {[["orders","📋"],["messages","📤"],["reminders","🔔"],["faq","❓"]].map(([k,l])=>(
+          <div key={k} onClick={()=>setTab(k)}
+            style={{flex:1,padding:"12px 4px",textAlign:"center",fontSize:20,color:tab===k?(belowMin?"#b91c1c":"#2d6a4f"):"#9ca3af",borderBottom:tab===k?`2px solid ${belowMin?"#b91c1c":"#2d6a4f"}`:"2px solid transparent",cursor:"pointer"}}>
+            {l}
+          </div>
+        ))}
+      </div>
+      <Body>
+        {tab==="orders"    && <OrdersTab coord={coord} time={time} showToast={showToast}/>}
+        {tab==="messages"  && <MessagesTab coord={coord} time={time} week={week} driver={driver} waGroupLink={waGroupLink} showToast={showToast}/>}
+        {tab==="reminders" && <RemindersTab coord={coord} waGroupLink={waGroupLink} showToast={showToast}/>}
+        {tab==="faq"       && <FaqTab/>}
+      </Body>
+      <Toast msg={toast}/>
+    </Screen>
+  );
+}
+
+function OrdersTab({coord,time,showToast}) {
+  const [copied,setCopied]=useState(false);
+  const [expanded,setExpanded]=useState(null);
+  function copyList(){
+    const lines=[`שלום חברים! 😊`,`הנה רשימת המזמינים לחלוקה היום בשעה ${time}:`,"",...coord.orders.map((o,i)=>`${i+1}. ${o.name}${o.phone?" — "+fmtPhone(o.phone):""}`),"",`סה"כ ${coord.orders.length} מזמינים. מחכים לכם! 🌿`];
+    navigator.clipboard.writeText(lines.join("\n")).then(()=>{setCopied(true);showToast("✅ הועתק");setTimeout(()=>setCopied(false),3500);});
+  }
+  return (
+    <Card>
+      <p style={{...T.cardTitle,marginBottom:14}}>📋 רשימת מזמינים</p>
+      {coord.orders.map((o,i)=>(
+        <div key={i} style={{borderBottom:i<coord.orders.length-1?"1px solid #e8ede9":"none"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",cursor:o.items?.length?"pointer":"default"}}
+            onClick={()=>o.items?.length&&setExpanded(expanded===i?null:i)}>
+            <div style={{fontSize:12,color:"#9ca3af",minWidth:22,fontWeight:700}}>{i+1}</div>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,fontSize:14}}>{o.name||"—"}</div>
+              <div style={{fontSize:12,color:"#6b7280",direction:"ltr"}}>{fmtPhone(o.phone)||"—"}</div>
+            </div>
+            {o.items?.length>0&&<div style={{fontSize:11,color:"#9ca3af"}}>{o.items.length} פריטים {expanded===i?"▲":"▼"}</div>}
+            {o.total>0&&<div style={{fontSize:13,fontWeight:700,color:"#2d6a4f",minWidth:40}}>₪{o.total}</div>}
+            {o.phone&&<a href={waLink(o.phone)} target="_blank" onClick={e=>e.stopPropagation()}
+              style={{width:34,height:34,background:"#25d366",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:16,textDecoration:"none",flexShrink:0}}>💬</a>}
+          </div>
+          {expanded===i&&o.items?.length>0&&(
+            <div style={{background:"#f8fdf9",borderRadius:10,padding:"10px 12px",marginBottom:8}}>
+              {o.items.map((item,j)=>(
+                <div key={j} style={{display:"flex",gap:8,padding:"4px 0",fontSize:13,borderBottom:j<o.items.length-1?"1px solid #e8ede9":"none"}}>
+                  <span style={{fontWeight:700,color:"#2d6a4f",minWidth:24}}>{item.qty}</span>
+                  <span style={{color:"#6b7280",minWidth:40}}>{item.unit}</span>
+                  <span style={{flex:1}}>{item.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+      <button onClick={copyList} style={{...S.btn,marginTop:14,background:copied?"#16a34a":"#2d6a4f",transition:"background .3s"}}>
+        {copied?"✅ הועתק — הדבק בקבוצה":"📋 העתק רשימה לוואטסאפ"}
+      </button>
+    </Card>
+  );
+}
+
+function MessagesTab({coord,time,week,driver,waGroupLink,showToast}) {
+  const storeLink=getStoreLink();
+  const msgs=[
+    {title:"🔔 פתיחת חנות",      sub:"לפרסום בקבוצה",              color:"#1a3c2e", text:buildStoreOpen(coord,time,week?.num||1)},
+    {title:"🌿 הודעה שבועית",    sub:"שיווק + לינק + קריאה לשתף", color:"#2d6a4f", text:buildGroupAnnounce(coord,time,week?.num||1)},
+    {title:"🔗 לינק החנות",      sub:"להעתקה ושיתוף",              color:"#52b788", text:storeLink},
+    {title:"💬 שירות לקוחות",   sub:"התכתבות WA בלבד",            color:"#f4a261", text:`שירות לקוחות פופ ישראל 💬\n${fmtPhone(CS_PHONE)}\n\n⚠️ בהתכתבות בוואטסאפ בלבד (לא שיחות)`},
+    {title:"📋 רווית — לוגיסטיקה", sub:"נהג / עיכוב / תיאום",    color:"#e67e22", text:`רווית — מתאמת לוגיסטיקה 🚐\n${fmtPhone(RAVIT_PHONE)}\n\nפונים לרווית רק בנושאים:\n• בעיה עם הנהג\n• עיכוב בחלוקה\n• תיאום מיוחד\n\nבעיות הזמנה ותשלום → שירות לקוחות בלבד.`},
+  ];
+  if(driver?.phone) msgs.push({title:`🚐 ${driver.name||"הנהג שלך"}`,sub:fmtPhone(driver.phone),color:"#6b7280",text:`הנהג שלך: ${driver.name||""}\n${fmtPhone(driver.phone)} 📞`});
+  return <>
+    {msgs.slice(0,3).map((m,i)=><CopyCard key={i} {...m} showToast={showToast}/>)}
+    <div style={{background:"#fffbeb",border:"1.5px solid #fcd34d",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+      <p style={{fontSize:12,fontWeight:800,color:"#92400e",marginBottom:6}}>📞 למי פונים?</p>
+      <div style={{fontSize:12,color:"#78350f",lineHeight:1.7}}>
+        <div>💬 <strong>שירות לקוחות</strong> — בעיות הזמנה, תשלום, איכות<br/><span style={{opacity:.75,paddingRight:20}}>התכתבות WA בלבד · {fmtPhone(CS_PHONE)}</span></div>
+        <div style={{marginTop:6}}>🚐 <strong>רווית</strong> — נהג / עיכוב / תיאום מיוחד<br/><span style={{opacity:.75,paddingRight:20}}>{fmtPhone(RAVIT_PHONE)}</span></div>
+      </div>
+    </div>
+    {msgs.slice(3).map((m,i)=><CopyCard key={i+3} {...m} showToast={showToast}/>)}
+    <Card>
+      <p style={{...T.cardTitle,marginBottom:10}}>💬 הודעות אישיות ללקוחות</p>
+      {coord.orders.filter(o=>o.phone).slice(0,5).map((o,i)=>(
+        <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #e8ede9"}}>
+          <div style={{flex:1,fontSize:13,fontWeight:600}}>{o.name}</div>
+          <a href={waLink(o.phone, buildPersonalMsg(o,coord,time))} target="_blank"
+            style={{background:"#25d366",color:"#fff",padding:"6px 12px",borderRadius:8,fontSize:12,fontWeight:700,textDecoration:"none"}}>💬 שלח</a>
+        </div>
+      ))}
+    </Card>
+  </>;
+}
+
+function CopyCard({title,sub,color,text,showToast}) {
+  const [copied,setCopied]=useState(false);
+  function copy(){navigator.clipboard.writeText(text).then(()=>{setCopied(true);showToast("✅ הועתק!");setTimeout(()=>setCopied(false),2500);});}
+  return (
+    <div style={{...S.card,borderRight:`4px solid ${color}`}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+        <div><div style={{fontSize:14,fontWeight:800,color:"#1a3c2e"}}>{title}</div><div style={{fontSize:11,color:"#6b7280"}}>{sub}</div></div>
+        <button onClick={copy} style={{background:copied?"#16a34a":color,color:"#fff",border:"none",padding:"7px 14px",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",transition:"background .3s",flexShrink:0}}>
+          {copied?"✅ הועתק":"📋 העתק"}
+        </button>
+      </div>
+      <div style={{background:"#f9fafb",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#374151",whiteSpace:"pre-wrap",direction:"rtl",lineHeight:1.6,maxHeight:90,overflow:"hidden"}}>
+        {text.length>180?text.slice(0,180)+"…":text}
+      </div>
+    </div>
+  );
+}
+
+function FaqTab() {
+  const [open,setOpen]=useState(null);
+  return (
+    <Card>
+      <p style={{...T.cardTitle,marginBottom:6}}>❓ שאלות נפוצות</p>
+      {FAQ.map((f,i)=>(
+        <div key={i} style={{borderBottom:"1px solid #e8ede9"}}>
+          <div onClick={()=>setOpen(open===i?null:i)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",cursor:"pointer"}}>
+            <span style={{fontSize:13,fontWeight:700,color:"#1a3c2e",flex:1,paddingLeft:8}}>{f.q}</span>
+            <span style={{color:"#6b7280",fontSize:16}}>{open===i?"▲":"▼"}</span>
+          </div>
+          {open===i&&<div style={{paddingBottom:12}}>
+            <div style={{background:"#f0fdf4",borderRadius:8,padding:"10px 12px",fontSize:13,color:"#374151",lineHeight:1.6,marginBottom:8}}>{f.a}</div>
+            <CopyBtnSimple text={`${f.q}\n${f.a}`} label="📋 העתק תשובה"/>
+          </div>}
+        </div>
+      ))}
+    </Card>
+  );
+}
+
+function RemindersTab({coord,waGroupLink,showToast}) {
+  const [notifGranted,setNotifGranted]=useState(typeof Notification!=="undefined"?Notification.permission==="granted":false);
+  async function requestNotif(){const perm=await Notification.requestPermission();setNotifGranted(perm==="granted");showToast(perm==="granted"?"✅ נוטיפיקציות פעילות!":"⚠️ לא אושר");}
+  function testNotif(){if(!notifGranted){showToast("⚠️ אשר קודם");return;}new Notification("🌿 תזכורת פופ ישראל",{body:"החנות פתוחה! הזמן עכשיו ✅"});}
+  const pilotMsg=buildPilotMsg(coord,waGroupLink);
+  return <>
+    <Card style={{borderRight:"4px solid #2d6a4f"}}>
+      <p style={{...T.cardTitle,marginBottom:6}}>📅 תזכורת שבועית</p>
+      {!notifGranted
+        ?<button style={S.btn} onClick={requestNotif}>🔔 אפשר תזכורות</button>
+        :<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          <button style={{...S.btnSmall,background:"#6b7280",padding:10}} onClick={testNotif}>🧪 בדוק עכשיו</button>
+        </div>}
+      {notifGranted&&<p style={{fontSize:11,color:"#16a34a",marginTop:10,textAlign:"center"}}>✅ נוטיפיקציות פעילות</p>}
+    </Card>
+    <Card style={{borderRight:"4px solid #f4a261"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+        <div><p style={{...T.cardTitle,marginBottom:2}}>🌱 הודעת פיילוט</p><p style={{fontSize:11,color:"#6b7280"}}>לפרסום לשכנים וחברים</p></div>
+        <CopyBtnSimple text={pilotMsg} label="📋 העתק"/>
+      </div>
+      <div style={{background:"#fffbf0",border:"1px solid #fde68a",borderRadius:10,padding:"12px",fontSize:12,color:"#374151",whiteSpace:"pre-wrap",lineHeight:1.7,maxHeight:220,overflowY:"auto",direction:"rtl"}}>
+        {pilotMsg}
+      </div>
+      {waGroupLink&&<a href={waGroupLink} target="_blank" style={{display:"block",marginTop:10,background:"#25d366",color:"#fff",padding:"10px",borderRadius:10,textAlign:"center",textDecoration:"none",fontWeight:700,fontSize:13}}>
+        💬 פתח קבוצת וואטסאפ
+      </a>}
+    </Card>
+  </>;
+}
+
+// ══════════════════════════════════════════════
+// SHARED COMPONENTS
+// ══════════════════════════════════════════════
+function GreenHeader({title,sub,children}){
+  return <div style={{background:"linear-gradient(155deg,#1a3c2e,#2d6a4f)",padding:"20px 20px 22px",color:"#fff",textAlign:"center"}}>
+    <div style={{fontSize:32,marginBottom:4}}>🌿</div>
+    <div style={{fontSize:22,fontWeight:900}}>{title}</div>
+    {sub&&<div style={{fontSize:12,opacity:.65,marginTop:2}}>{sub}</div>}
+    {children}
+  </div>;
+}
+function Screen({children}){return <div style={{fontFamily:"'Heebo',sans-serif",minHeight:"100vh",background:"#fefcf7",direction:"rtl",maxWidth:480,margin:"0 auto"}}>{children}</div>;}
+function Body({children}){return <div style={{padding:"14px 14px 48px"}}>{children}</div>;}
+function Card({children,style={}}){return <div style={{...S.card,...style}}>{children}</div>;}
+function Spinner(){return <div style={{width:36,height:36,border:"4px solid #e8ede9",borderTopColor:"#2d6a4f",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>;}
+function Centered({children}){return <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:60,gap:14}}>{children}</div>;}
+function Muted({children}){return <p style={{color:"#6b7280",fontSize:14}}>{children}</p>;}
+function Toast({msg}){return msg?<div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#1a3c2e",color:"#fff",padding:"12px 22px",borderRadius:99,fontSize:14,fontWeight:600,zIndex:999,whiteSpace:"nowrap",boxShadow:"0 4px 20px rgba(0,0,0,.25)"}}>{msg}</div>:null;}
+function CopyBtnSimple({text,label}){
+  const [c,setC]=useState(false);
+  return <button onClick={()=>{navigator.clipboard.writeText(text).then(()=>{setC(true);setTimeout(()=>setC(false),2000);});}}
+    style={{background:c?"#16a34a":"#2d6a4f",color:"#fff",border:"none",padding:"7px 14px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",transition:"background .3s"}}>
+    {c?"✅ הועתק":label}
+  </button>;
+}
+
+const S={
+  card:{background:"#fff",borderRadius:16,padding:"16px 14px",boxShadow:"0 2px 14px rgba(26,60,46,.09)",marginBottom:12},
+  btn:{width:"100%",padding:13,background:"#2d6a4f",color:"#fff",border:"none",borderRadius:12,fontFamily:"Heebo,sans-serif",fontSize:15,fontWeight:800,cursor:"pointer"},
+  btnSmall:{padding:"9px 12px",background:"#2d6a4f",color:"#fff",border:"none",borderRadius:8,fontFamily:"Heebo,sans-serif",fontSize:12,fontWeight:700,cursor:"pointer"},
+  iconBtn:{width:34,height:34,border:"none",borderRadius:8,background:"#f3f4f6",cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center"},
+  stepNum:{width:26,height:26,color:"#fff",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,flexShrink:0},
+  statBox:{background:"#fff",borderRadius:14,padding:"12px 8px",textAlign:"center",boxShadow:"0 2px 10px rgba(26,60,46,.08)"},
+  statVal:{fontSize:18,fontWeight:900,color:"#2d6a4f"},
+  statLbl:{fontSize:10,color:"#6b7280",marginTop:2},
+  input:{width:"100%",border:"1.5px solid #d1fae5",borderRadius:8,padding:"7px 10px",fontSize:13,fontFamily:"Heebo,sans-serif",color:"#1a3c2e",background:"#f9fafb",outline:"none"},
+};
+const T={
+  h2:{fontSize:17,fontWeight:800,color:"#1a3c2e",marginBottom:6},
+  muted:{color:"#6b7280",fontSize:13},
+  cardTitle:{fontSize:12,fontWeight:800,color:"#2d6a4f",textTransform:"uppercase",letterSpacing:".4px"},
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
