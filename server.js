@@ -65,7 +65,7 @@ const COORD_BLOCKLIST = new Set([
 
 // רכזים ידניים שמוחלפים/נוספים ללא תלות בגיליון
 const COORD_MANUAL = [
-  { coordKey: 'אוסנת', coordName: 'אוסנת', city: 'בטעון' },
+  { coordKey: 'אוסנת', coordName: 'אוסנת', city: 'טבעון' },
 ];
 
 // ── POST /api/coordinators — refresh.js posts active coordinator list here
