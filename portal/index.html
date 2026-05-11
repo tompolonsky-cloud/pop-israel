@@ -366,12 +366,34 @@ function App() {
 // ══════════════════════════════════════════════
 // ADMIN SCREEN
 // ══════════════════════════════════════════════
+function getCoordStatus(coord) {
+  const p = pilotInfo(coord.launchDate);
+  const orders = coord.orders.length;
+  const revenue = coord.orders.reduce((s,o) => s+o.total, 0);
+  if (p.status === 'regular') {
+    if (revenue < 1000) return 'red';
+    if (revenue < 1300) return 'yellow';
+    return 'green';
+  }
+  if (orders < 5)  return 'red';
+  if (orders < 8)  return 'yellow';
+  return 'green';
+}
+const STATUS_SORT   = { red:0, yellow:1, green:2 };
+const STATUS_EMOJI  = { red:'🔴', yellow:'🟡', green:'🟢' };
+const STATUS_BG     = { red:'#fef2f2', yellow:'#fffbeb', green:'#f0fdf4' };
+const STATUS_BORDER = { red:'#fca5a5', yellow:'#fcd34d', green:'#86efac' };
+
 function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedAt,onSaveTimes,onSaveDrivers,onSaveWaLinks,onFireNotif,onCoordLink,onCoordWA,onOpenCoord,onUpdateMembers,toast,showToast}) {
   const [adTab,setAdTab]=useState("overview");
+  const [search,setSearch]=useState("");
   const [localTimes,setLocalTimes]=useState({...times});
   const [localDrivers,setLocalDrivers]=useState({...drivers});
   const [localWaLinks,setLocalWaLinks]=useState({...waLinks});
   const [membersInput,setMembersInput]=useState({});
+
+  const sortedCoords=[...coords].sort((a,b)=>STATUS_SORT[getCoordStatus(a)]-STATUS_SORT[getCoordStatus(b)]);
+  const filteredCoords=search?coords.filter(c=>c.coordName.includes(search)||(c.city||'').includes(search)):coords;
 
   const totalOrders=coords.reduce((s,c)=>s+c.orders.length,0);
   const totalRev=coords.reduce((s,c)=>s+c.orders.reduce((x,o)=>x+o.total,0),0);
@@ -407,18 +429,33 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
             ))}
           </div>
 
-          <Card style={{borderRight:storeOpen?"4px solid #16a34a":"4px solid #2d6a4f"}}>
-            <p style={{...T.cardTitle,marginBottom:6}}>{storeOpen?"✅ החנות פתוחה השבוע":"🔔 פתח חנות"}</p>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {coords.map(c=>(
-                <button key={c.coordKey} onClick={()=>onFireNotif(c)}
-                  style={{...S.btnSmall,background:"#1a3c2e",display:"flex",alignItems:"center",gap:8,justifyContent:"flex-start",textAlign:"right",padding:"10px 14px"}}>
-                  <span>🔔</span>
-                  <span style={{flex:1}}>{c.coordName} — {c.city}</span>
-                  <span style={{fontSize:10,opacity:.7}}>{c.orders.length} מזמינים</span>
-                </button>
-              ))}
-            </div>
+          <Card>
+            <p style={{...T.cardTitle,marginBottom:10}}>🚦 סטטוס רכזים</p>
+            {sortedCoords.map(c=>{
+              const st=getCoordStatus(c);
+              const pilot=pilotInfo(c.launchDate);
+              const isReg=pilot.status==='regular';
+              const rev=c.orders.reduce((s,o)=>s+o.total,0);
+              return (
+                <div key={c.coordKey} onClick={()=>onOpenCoord(c)}
+                  style={{display:'flex',alignItems:'center',gap:10,padding:'9px 10px',borderRadius:10,
+                    background:STATUS_BG[st],border:`1px solid ${STATUS_BORDER[st]}`,marginBottom:6,cursor:'pointer'}}>
+                  <span style={{fontSize:15}}>{STATUS_EMOJI[st]}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.coordName}</div>
+                    <div style={{fontSize:11,color:'#6b7280'}}>{c.city}</div>
+                  </div>
+                  <div style={{textAlign:'center',minWidth:52,flexShrink:0}}>
+                    <div style={{fontSize:14,fontWeight:900,color:'#1a3c2e'}}>
+                      {isReg?`₪${rev.toLocaleString('he-IL')}`:`${c.orders.length} הז׳`}
+                    </div>
+                    <div style={{fontSize:10,color:'#9ca3af'}}>{isReg?'הכנסות':'הזמנות'}</div>
+                  </div>
+                  <button onClick={e=>{e.stopPropagation();onFireNotif(c);}}
+                    style={{...S.iconBtn,background:'#1a3c2e',color:'#ffd166',flexShrink:0}}>🔔</button>
+                </div>
+              );
+            })}
           </Card>
 
           <Card>
@@ -433,9 +470,12 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
         </>}
 
         {adTab==="coords" && <>
+          <input value={search} onChange={e=>setSearch(e.target.value)}
+            placeholder="🔍 חיפוש לפי שם או עיר..."
+            style={{...S.input,marginBottom:12,fontSize:14}}/>
           <Card>
             <p style={{...T.cardTitle,marginBottom:14}}>🔗 לינקים אישיים</p>
-            {coords.map(c=>(
+            {filteredCoords.map(c=>(
               <div key={c.coordKey} style={{padding:"11px 0",borderBottom:"1px solid #e8ede9"}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                   <div style={{flex:1}}>
@@ -452,7 +492,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
           </Card>
           <Card>
             <p style={{...T.cardTitle,marginBottom:14}}>⏰ שעות חלוקה</p>
-            {coords.map(c=>(
+            {filteredCoords.map(c=>(
               <div key={c.coordKey} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #e8ede9"}}>
                 <div style={{flex:1,fontSize:13,fontWeight:600}}>{c.coordName} <span style={{color:"#6b7280",fontWeight:400}}>— {c.city}</span></div>
                 <input type="time" value={localTimes[c.coordKey]||"17:00"}
