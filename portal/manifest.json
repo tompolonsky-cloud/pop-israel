@@ -1,0 +1,13 @@
+{
+  "name": "פופ ישראל — פורטל רכזים",
+  "short_name": "פופ ישראל",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fefcf7",
+  "theme_color": "#1a3c2e",
+  "lang": "he",
+  "dir": "rtl",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

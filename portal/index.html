@@ -4,6 +4,11 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>פורטל פופ ישראל 🌿</title>
+<link rel="manifest" href="/manifest.json"/>
+<meta name="theme-color" content="#1a3c2e"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<link rel="apple-touch-icon" href="/icon.svg"/>
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -17,6 +22,11 @@
 <body>
 <div id="root"></div>
 
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+}
+</script>
 <script type="text/babel">
 const { useState, useEffect } = React;
 
@@ -87,6 +97,7 @@ const K_NOTIFS   = "pop_v6_notifs";
 const K_PROGRESS = "pop_v6_progress";
 const K_DRIVERS  = "pop_v6_drivers";
 const K_WALINKS  = "pop_v6_walinks";
+const K_HISTORY  = "pop_v6_history";
 
 // ══════════════════════════════════════════════
 // HELPERS
@@ -208,6 +219,7 @@ function App() {
   const [week,      setWeek]     = useState({num:1,label:"שבוע 1",openedAt:null});
   const [notifs,    setNotifs]   = useState([]);
   const [progress,  setProgress] = useState([]);
+  const [coordHistory, setCoordHistory] = useState({});
   const [selCoord,  setSelCoord] = useState(null);
   const [tab,       setTab]      = useState("orders");
   const [toast,     setToast]    = useState("");
@@ -237,6 +249,8 @@ function App() {
     if(p)  setProgress(p);
     if(dr) setDrivers(dr);
     if(wl) setWaLinks(wl);
+    const ch = sto_get(K_HISTORY);
+    if(ch) setCoordHistory(ch);
 
     // Fetch server settings (secretary writes here, all portals read)
     try {
@@ -246,6 +260,7 @@ function App() {
       if (sv.drivers && Object.keys(sv.drivers).length)  { setDrivers(sv.drivers); sto_set(K_DRIVERS, sv.drivers); }
       if (sv.waLinks && Object.keys(sv.waLinks).length)  { setWaLinks(sv.waLinks); sto_set(K_WALINKS, sv.waLinks); }
       if (sv.week?.num) { setWeek(sv.week); sto_set(K_WEEK, sv.week); }
+      if (sv.coordHistory) { setCoordHistory(sv.coordHistory); sto_set(K_HISTORY, sv.coordHistory); }
     } catch(e) {}
 
     try {
@@ -289,9 +304,14 @@ function App() {
     const msg=buildStoreOpen(coord,t,week.num);
     const newN=[{ts:Date.now(),coordKey:coord.coordKey,coordName:coord.coordName,week:week.num},...(notifs||[])].slice(0,50);
     const newWeek={...week,openedAt:Date.now()};
-    setNotifs(newN); setWeek(newWeek);
-    sto_set(K_NOTIFS,newN); sto_set(K_WEEK,newWeek);
-    postSettings({week:newWeek});
+
+    const snap={ week:week.num, orders:coord.orders.length, revenue:coord.orders.reduce((s,o)=>s+o.total,0), date:new Date().toISOString() };
+    const prev=(coordHistory[coord.coordKey]||[]).filter(h=>h.week!==week.num);
+    const newHistory={...coordHistory, [coord.coordKey]:[...prev,snap].sort((a,b)=>a.week-b.week)};
+
+    setNotifs(newN); setWeek(newWeek); setCoordHistory(newHistory);
+    sto_set(K_NOTIFS,newN); sto_set(K_WEEK,newWeek); sto_set(K_HISTORY,newHistory);
+    postSettings({week:newWeek, coordHistory:newHistory});
     navigator.clipboard.writeText(msg).then(()=>showToast("🔔 הודעת פתיחה הועתקה — הדבק בקבוצה!"));
   }
 
@@ -337,7 +357,7 @@ function App() {
       driver={drivers[selCoord?.coordKey]||null}
       waGroupLink={waLinks[selCoord?.coordKey]||""}
       week={week} onBack={coordParam?null:()=>setView("admin")}
-      updatedAt={updatedAt}
+      updatedAt={updatedAt} history={coordHistory[selCoord?.coordKey]||[]}
       tab={tab} setTab={setTab} toast={toast} showToast={showToast}/>;
 
   return null;
@@ -514,7 +534,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
 // ══════════════════════════════════════════════
 // COORDINATOR SCREEN — same as v5
 // ══════════════════════════════════════════════
-function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast,showToast,updatedAt}) {
+function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast,showToast,updatedAt,history}) {
   if(!coord) return null;
   const totalRev=coord.orders.reduce((s,o)=>s+o.total,0);
   const orderCount=coord.orders.length;
@@ -628,7 +648,7 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
       <Body>
         {tab==="orders"    && <OrdersTab coord={coord} time={time} showToast={showToast}/>}
         {tab==="messages"  && <MessagesTab coord={coord} time={time} week={week} pilot={pilot} driver={driver} waGroupLink={waGroupLink} showToast={showToast}/>}
-        {tab==="reminders" && <RemindersTab coord={coord} pilot={pilot} activeReminders={activeReminders} waGroupLink={waGroupLink} showToast={showToast}/>}
+        {tab==="reminders" && <RemindersTab coord={coord} pilot={pilot} activeReminders={activeReminders} waGroupLink={waGroupLink} history={history} showToast={showToast}/>}
         {tab==="faq"       && <FaqTab/>}
       </Body>
       <Toast msg={toast}/>
@@ -652,7 +672,10 @@ function OrdersTab({coord,time,showToast}) {
             onClick={()=>o.items?.length&&setExpanded(expanded===i?null:i)}>
             <div style={{fontSize:12,color:"#9ca3af",minWidth:22,fontWeight:700}}>{i+1}</div>
             <div style={{flex:1}}>
-              <div style={{fontWeight:700,fontSize:14}}>{o.name||"—"}</div>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <span style={{fontWeight:700,fontSize:14}}>{o.name||"—"}</span>
+                {o.returning===false&&<span style={{background:"#dbeafe",color:"#1d4ed8",fontSize:10,fontWeight:700,padding:"1px 6px",borderRadius:99}}>חדש 🆕</span>}
+              </div>
               <div style={{fontSize:12,color:"#6b7280",direction:"ltr"}}>{fmtPhone(o.phone)||"—"}</div>
             </div>
             {o.items?.length>0&&<div style={{fontSize:11,color:"#9ca3af"}}>{o.items.length} פריטים {expanded===i?"▲":"▼"}</div>}
@@ -753,7 +776,7 @@ function FaqTab() {
   );
 }
 
-function RemindersTab({coord,pilot,activeReminders,waGroupLink,showToast}) {
+function RemindersTab({coord,pilot,activeReminders,waGroupLink,history,showToast}) {
   const [notifGranted,setNotifGranted]=useState(typeof Notification!=="undefined"?Notification.permission==="granted":false);
   async function requestNotif(){const perm=await Notification.requestPermission();setNotifGranted(perm==="granted");showToast(perm==="granted"?"✅ נוטיפיקציות פעילות!":"⚠️ לא אושר");}
   function testNotif(){if(!notifGranted){showToast("⚠️ אשר קודם");return;}new Notification("🌿 תזכורת פופ ישראל",{body:"החנות פתוחה! הזמן עכשיו ✅"});}
@@ -788,6 +811,13 @@ function RemindersTab({coord,pilot,activeReminders,waGroupLink,showToast}) {
         </a>}
       </Card>
     )}
+    {history?.length > 0 && (
+      <Card style={{borderRight:"4px solid #52b788"}}>
+        <p style={{...T.cardTitle,marginBottom:12}}>📊 היסטוריית הזמנות</p>
+        <MiniBarChart data={history}/>
+      </Card>
+    )}
+
     {pilot?.status==="regular" && (
       <Card style={{borderRight:"4px solid #16a34a",textAlign:"center",padding:"24px 16px"}}>
         <div style={{fontSize:36,marginBottom:8}}>🎉</div>
@@ -796,6 +826,22 @@ function RemindersTab({coord,pilot,activeReminders,waGroupLink,showToast}) {
       </Card>
     )}
   </>;
+}
+
+function MiniBarChart({data}) {
+  const maxOrders = Math.max(...data.map(d=>d.orders), 1);
+  return (
+    <div style={{display:"flex",alignItems:"flex-end",gap:6,height:72}}>
+      {data.map((d,i)=>(
+        <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+          <div style={{fontSize:10,fontWeight:700,color:"#2d6a4f"}}>{d.orders}</div>
+          <div style={{width:"100%",background:"#52b788",borderRadius:"4px 4px 0 0",minHeight:4,
+            height:Math.max(4,Math.round((d.orders/maxOrders)*44))+"px",transition:"height .4s"}}/>
+          <div style={{fontSize:9,color:"#9ca3af",whiteSpace:"nowrap"}}>ש׳{d.week}</div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // ══════════════════════════════════════════════
