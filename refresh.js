@@ -59,6 +59,15 @@ async function main() {
 
     if (!csv || csv.length < 50) throw new Error('CSV ריק');
 
+    // שליפת רשימת רכזים מהגיליון — הדפדפן כבר מחובר ל-Google
+    let sheetCsv = null;
+    try {
+      sheetCsv = await page.evaluate(async (url) => {
+        const r = await fetch(url, { credentials: 'include' });
+        return r.ok ? r.text() : null;
+      }, SHEET_URL);
+    } catch(e) {}
+
     await context.close();
 
     // Send to local server
@@ -67,16 +76,15 @@ async function main() {
     console.log(`✅ עודכן בהצלחה [${new Date().toLocaleString('he-IL')}]`);
     console.log(`   שורות: ${csv.split('\n').length - 1}`);
 
-    // עדכון רשימת רכזים — קורא מקובץ מקומי שמתעדכן ידנית
+    // עדכון רשימת רכזים
     const LOCAL_COORD = path.join(__dirname, 'data', 'coordinators.json');
-    if (fs.existsSync(LOCAL_COORD)) {
-      try {
-        const coords = JSON.parse(fs.readFileSync(LOCAL_COORD, 'utf-8'));
-        await postJSON(CLOUD_COORD, coords);
-        console.log(`   רכזים פעילים: ${coords.length}`);
-      } catch(e) {
-        console.warn(`   ⚠️ לא עודכנה רשימת רכזים: ${e.message}`);
-      }
+    try {
+      const coords = sheetCsv ? parseSheetCoords(sheetCsv) : JSON.parse(fs.readFileSync(LOCAL_COORD, 'utf-8'));
+      if (sheetCsv) fs.writeFileSync(LOCAL_COORD, JSON.stringify(coords, null, 2));
+      await postJSON(CLOUD_COORD, coords);
+      console.log(`   רכזים פעילים: ${coords.length}${sheetCsv ? ' (עודכן מהגיליון)' : ' (מקובץ מקומי)'}`);
+    } catch(e) {
+      console.warn(`   ⚠️ לא עודכנה רשימת רכזים: ${e.message}`);
     }
 
   } catch (err) {
