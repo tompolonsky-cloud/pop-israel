@@ -1,4 +1,4 @@
-const CACHE = 'pop-v3';
+const CACHE = 'pop-v4';
 const PRECACHE = ['/', '/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', e => {

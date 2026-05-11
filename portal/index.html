@@ -176,6 +176,14 @@ function matchCoord(coords, cp) {
 const HE_EN = {'סיון':'sivan','מרים':'miryam','מירים':'miryam','נועם':'noam','שרה':'sarah','רבקה':'rivka','יוסף':'yosef','משה':'moshe'};
 function normName(s){ const l=(s||'').toLowerCase().replace(/[''']/g,''); return HE_EN[l]||l; }
 
+// מיפוי ידני: coordKey מה-CSV (הזמנות) → coordKey מהגיליון
+// עבור רכזים שהשם שלהם במערכת ההזמנות שונה לגמרי מהשם בגיליון
+const COORD_ALIASES = {
+  'רעננה-מתחם-מיקסר': 'אדם-פליישמן',
+  'מתחם-מיקסר': 'אדם-פליישמן',
+  'רעננה-מתחם-מיקסר-(קמפוס-אמדוקס)': 'אדם-פליישמן',
+};
+
 function extractFirstName(coordKey) {
   // "שורשים--טליה" → "טליה", "כרמיאל--מכוש-מירב" → "מירב", "רחלי" → "רחלי"
   const parts = coordKey.split('--');
@@ -197,6 +205,7 @@ function mergeCoordsWithList(coords, allCoords) {
     const sheetFirst = normName(sheetCoord.coordKey.split('-')[0]);
     const match = coords.find(c =>
       c.coordKey === sheetCoord.coordKey ||
+      COORD_ALIASES[c.coordKey] === sheetCoord.coordKey ||
       normName(extractFirstName(c.coordKey)) === sheetFirst
     );
     if (match) {
