@@ -196,6 +196,9 @@ function mergeCoordsWithList(coords, allCoords) {
     return { ...sheetCoord, orders: [], coordPhone: '' };
   });
 }
+function CoordName({name, style={}}) {
+  return <span dir="auto" style={{unicodeBidi:'plaintext',...style}}>{name}</span>;
+}
 function fmtPhone(p) {
   if(!p||p.length<9) return p||"";
   if(p.startsWith("0")&&p.length===10) return `${p.slice(0,3)}-${p.slice(3,6)}-${p.slice(6)}`;
@@ -457,7 +460,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
                     background:STATUS_BG[st],border:`1px solid ${STATUS_BORDER[st]}`,marginBottom:6,cursor:'pointer'}}>
                   <span style={{fontSize:15}}>{STATUS_EMOJI[st]}</span>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.coordName}</div>
+                    <div style={{fontSize:13,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}><CoordName name={c.coordName}/></div>
                     <div style={{fontSize:11,color:'#6b7280'}}>{c.city}</div>
                   </div>
                   <div style={{textAlign:'center',minWidth:52,flexShrink:0}}>
@@ -494,7 +497,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
               <div key={c.coordKey} style={{padding:"11px 0",borderBottom:"1px solid #e8ede9"}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                   <div style={{flex:1}}>
-                    <div style={{fontWeight:700,fontSize:14}}>{c.coordName}</div>
+                    <div style={{fontWeight:700,fontSize:14}}><CoordName name={c.coordName}/></div>
                     <div style={{fontSize:11,color:"#6b7280"}}>{c.city} · {c.orders.length} מזמינים</div>
                   </div>
                   <button style={S.iconBtn} onClick={()=>onCoordLink(c)}>📋</button>
@@ -509,7 +512,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
             <p style={{...T.cardTitle,marginBottom:14}}>⏰ שעות חלוקה</p>
             {filteredCoords.map(c=>(
               <div key={c.coordKey} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #e8ede9"}}>
-                <div style={{flex:1,fontSize:13,fontWeight:600}}>{c.coordName} <span style={{color:"#6b7280",fontWeight:400}}>— {c.city}</span></div>
+                <div style={{flex:1,fontSize:13,fontWeight:600}}><CoordName name={c.coordName}/> <span style={{color:"#6b7280",fontWeight:400}}>— {c.city}</span></div>
                 <input type="time" value={localTimes[c.coordKey]||"17:00"}
                   onChange={e=>setLocalTimes({...localTimes,[c.coordKey]:e.target.value})}
                   style={{border:"1.5px solid #d1fae5",borderRadius:8,padding:"5px 8px",fontSize:13,fontFamily:"Heebo,sans-serif",color:"#1a3c2e"}}/>
@@ -526,7 +529,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
               const d=localDrivers[c.coordKey]||{};
               return (
                 <div key={c.coordKey} style={{padding:"12px 0",borderBottom:"1px solid #e8ede9"}}>
-                  <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>{c.coordName} <span style={{color:"#6b7280",fontWeight:400,fontSize:12}}>— {c.city}</span></div>
+                  <div style={{fontWeight:700,fontSize:14,marginBottom:8}}><CoordName name={c.coordName}/> <span style={{color:"#6b7280",fontWeight:400,fontSize:12}}>— {c.city}</span></div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <input value={d.name||""} onChange={e=>updDriver(c.coordKey,"name",e.target.value)} placeholder="שם הנהג" style={S.input}/>
                     <input value={d.phone||""} onChange={e=>updDriver(c.coordKey,"phone",e.target.value)} placeholder="05X-XXX-XXXX" style={S.input} type="tel"/>
@@ -543,7 +546,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
             <p style={{...T.cardTitle,marginBottom:6}}>💬 לינקי קבוצת וואטסאפ</p>
             {coords.map(c=>(
               <div key={c.coordKey} style={{padding:"10px 0",borderBottom:"1px solid #e8ede9"}}>
-                <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>{c.coordName} <span style={{color:"#6b7280",fontWeight:400}}>— {c.city}</span></div>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:6}}><CoordName name={c.coordName}/> <span style={{color:"#6b7280",fontWeight:400}}>— {c.city}</span></div>
                 <input value={localWaLinks[c.coordKey]||""} onChange={e=>setLocalWaLinks({...localWaLinks,[c.coordKey]:e.target.value})}
                   placeholder="https://chat.whatsapp.com/..." style={{...S.input,fontSize:12,direction:"ltr"}}/>
               </div>
