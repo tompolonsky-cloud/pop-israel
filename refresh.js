@@ -67,14 +67,16 @@ async function main() {
     console.log(`✅ עודכן בהצלחה [${new Date().toLocaleString('he-IL')}]`);
     console.log(`   שורות: ${csv.split('\n').length - 1}`);
 
-    // גם מעדכן רשימת רכזים מהגיליון
-    try {
-      const sheetCsv = await fetchUrl(SHEET_URL);
-      const coords = parseSheetCoords(sheetCsv);
-      await postJSON(CLOUD_COORD, coords);
-      console.log(`   רכזים פעילים: ${coords.length}`);
-    } catch(e) {
-      console.warn(`   ⚠️ לא עודכנה רשימת רכזים: ${e.message}`);
+    // עדכון רשימת רכזים — קורא מקובץ מקומי שמתעדכן ידנית
+    const LOCAL_COORD = path.join(__dirname, 'data', 'coordinators.json');
+    if (fs.existsSync(LOCAL_COORD)) {
+      try {
+        const coords = JSON.parse(fs.readFileSync(LOCAL_COORD, 'utf-8'));
+        await postJSON(CLOUD_COORD, coords);
+        console.log(`   רכזים פעילים: ${coords.length}`);
+      } catch(e) {
+        console.warn(`   ⚠️ לא עודכנה רשימת רכזים: ${e.message}`);
+      }
     }
 
   } catch (err) {
