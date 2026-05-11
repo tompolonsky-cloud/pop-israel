@@ -98,6 +98,7 @@ const K_PROGRESS = "pop_v6_progress";
 const K_DRIVERS  = "pop_v6_drivers";
 const K_WALINKS  = "pop_v6_walinks";
 const K_HISTORY  = "pop_v6_history";
+const K_MEMBERS  = "pop_v6_members";
 
 // ══════════════════════════════════════════════
 // HELPERS
@@ -272,6 +273,7 @@ function App() {
   const [notifs,    setNotifs]   = useState([]);
   const [progress,  setProgress] = useState([]);
   const [coordHistory, setCoordHistory] = useState({});
+  const [memberData,   setMemberData]   = useState({});
   const [selCoord,  setSelCoord] = useState(null);
   const [tab,       setTab]      = useState("orders");
   const [toast,     setToast]    = useState("");
@@ -303,6 +305,8 @@ function App() {
     if(wl) setWaLinks(wl);
     const ch = sto_get(K_HISTORY);
     if(ch) setCoordHistory(ch);
+    const md = sto_get(K_MEMBERS);
+    if(md) setMemberData(md);
 
     // Fetch server settings (secretary writes here, all portals read)
     try {
@@ -313,6 +317,7 @@ function App() {
       if (sv.waLinks && Object.keys(sv.waLinks).length)  { setWaLinks(sv.waLinks); sto_set(K_WALINKS, sv.waLinks); }
       if (sv.week?.num) { setWeek(sv.week); sto_set(K_WEEK, sv.week); }
       if (sv.coordHistory) { setCoordHistory(sv.coordHistory); sto_set(K_HISTORY, sv.coordHistory); }
+      if (sv.memberData)   { setMemberData(sv.memberData);     sto_set(K_MEMBERS, sv.memberData);   }
     } catch(e) {}
 
     try {
@@ -350,6 +355,7 @@ function App() {
   async function saveTimes(t)  { setTimes(t);   sto_set(K_TIMES,t);   await postSettings({times:t});   showToast("✅ שעות נשמרו"); }
   async function saveDrivers(dr){ setDrivers(dr); sto_set(K_DRIVERS,dr); await postSettings({drivers:dr}); showToast("✅ נהגים נשמרו"); }
   async function saveWaLinks(wl){ setWaLinks(wl); sto_set(K_WALINKS,wl); await postSettings({waLinks:wl}); showToast("✅ לינקי קבוצה נשמרו"); }
+  async function saveMemberData(md){ setMemberData(md); sto_set(K_MEMBERS,md); await postSettings({memberData:md}); showToast("✅ נתוני חברים נשמרו"); }
 
   async function fireNotif(coord) {
     const t=times[coord.coordKey]||"17:00";
@@ -398,8 +404,9 @@ function App() {
   );
 
   if(view==="admin") return <AdminScreen coords={coords} times={times} drivers={drivers} waLinks={waLinks} week={week}
-      notifs={notifs} progress={progress} updatedAt={updatedAt}
+      notifs={notifs} progress={progress} updatedAt={updatedAt} memberData={memberData}
       onSaveTimes={saveTimes} onSaveDrivers={saveDrivers} onSaveWaLinks={saveWaLinks} onFireNotif={fireNotif}
+      onSaveMemberData={saveMemberData}
       onCoordLink={copyCoordLink} onCoordWA={sendCoordWA}
       onOpenCoord={c=>{setSelCoord(c);setTab("orders");setView("coord");}}
       onUpdateMembers={updateMembers} toast={toast} showToast={showToast}/>;
@@ -410,6 +417,7 @@ function App() {
       waGroupLink={waLinks[selCoord?.coordKey]||""}
       week={week} onBack={coordParam?null:()=>setView("admin")}
       updatedAt={updatedAt} history={coordHistory[selCoord?.coordKey]||[]}
+      memberEntry={memberData[selCoord?.coordKey]||null}
       tab={tab} setTab={setTab} toast={toast} showToast={showToast}/>;
 
   return null;
@@ -436,12 +444,13 @@ const STATUS_EMOJI  = { red:'🔴', yellow:'🟡', green:'🟢' };
 const STATUS_BG     = { red:'#fef2f2', yellow:'#fffbeb', green:'#f0fdf4' };
 const STATUS_BORDER = { red:'#fca5a5', yellow:'#fcd34d', green:'#86efac' };
 
-function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedAt,onSaveTimes,onSaveDrivers,onSaveWaLinks,onFireNotif,onCoordLink,onCoordWA,onOpenCoord,onUpdateMembers,toast,showToast}) {
+function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedAt,memberData,onSaveTimes,onSaveDrivers,onSaveWaLinks,onFireNotif,onSaveMemberData,onCoordLink,onCoordWA,onOpenCoord,onUpdateMembers,toast,showToast}) {
   const [adTab,setAdTab]=useState("overview");
   const [search,setSearch]=useState("");
   const [localTimes,setLocalTimes]=useState({...times});
   const [localDrivers,setLocalDrivers]=useState({...drivers});
   const [localWaLinks,setLocalWaLinks]=useState({...waLinks});
+  const [localMembers,setLocalMembers]=useState({...memberData});
   const [membersInput,setMembersInput]=useState({});
 
   const sortedCoords=[...coords].sort((a,b)=>a.orders.length-b.orders.length);
@@ -450,8 +459,12 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
   const totalOrders=coords.reduce((s,c)=>s+c.orders.length,0);
   const totalRev=coords.reduce((s,c)=>s+c.orders.reduce((x,o)=>x+o.total,0),0);
   const latestMembers=(progress||[]).filter(p=>p.members!=null).slice(-1)[0]?.members||0;
-  const membersPct=Math.min(100,Math.round((latestMembers/GROUP_TARGET)*100));
+  const totalGroupMembers=Object.values(memberData||{}).reduce((s,e)=>s+(e?.count||0),0);
+  const membersPct=Math.min(100,Math.round((totalGroupMembers/GROUP_TARGET)*100));
   const storeOpen=week.openedAt&&(Date.now()-week.openedAt<7*24*3600*1000);
+  // coordinators not updated in the last 8 days
+  const now8=Date.now()-8*24*3600*1000;
+  const staleCoords=coords.filter(c=>{const e=memberData?.[c.coordKey]; return !e||!e.lastUpdated||new Date(e.lastUpdated).getTime()<now8;});
 
   const updatedStr = updatedAt ? new Date(updatedAt).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}) : null;
 
@@ -515,13 +528,28 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
 
           <Card>
             <p style={{...T.cardTitle,marginBottom:10}}>🎯 יעד קבוצה — {GROUP_TARGET} חברים</p>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
               <div style={{flex:1,background:"#e8ede9",borderRadius:99,height:12,overflow:"hidden"}}>
                 <div style={{width:membersPct+"%",height:"100%",background:"linear-gradient(90deg,#2d6a4f,#52b788)",borderRadius:99,transition:"width 1s"}}/>
               </div>
               <span style={{fontSize:14,fontWeight:900,color:"#2d6a4f",minWidth:38}}>{membersPct}%</span>
             </div>
+            <div style={{fontSize:11,color:"#6b7280",textAlign:"center"}}>{totalGroupMembers} / {GROUP_TARGET} חברים בסך הכל</div>
           </Card>
+
+          {staleCoords.length>0&&(
+            <Card style={{borderRight:"4px solid #f59e0b"}}>
+              <p style={{...T.cardTitle,marginBottom:10,color:"#b45309"}}>⚠️ טרם עודכן — חברי קבוצה</p>
+              <p style={{fontSize:11,color:"#78350f",marginBottom:10}}>הרכזים הבאים לא עודכנו השבוע. עדכני ב-👥 טאב "רכזים":</p>
+              {staleCoords.map(c=>(
+                <div key={c.coordKey} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"1px solid #fef3c7"}}>
+                  <span style={{fontSize:13}}>🔶</span>
+                  <div style={{flex:1,fontSize:13,fontWeight:600}}><CoordName name={c.coordName}/></div>
+                  <div style={{fontSize:11,color:"#9ca3af"}}>{c.city}</div>
+                </div>
+              ))}
+            </Card>
+          )}
         </>}
 
         {adTab==="coords" && <>
@@ -545,6 +573,33 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
               </div>
             ))}
           </Card>
+          <Card>
+            <p style={{...T.cardTitle,marginBottom:14}}>👥 חברי קבוצות</p>
+            <p style={{fontSize:11,color:"#6b7280",marginBottom:12}}>עדכני פעם בשבוע — מספר חברים ומתי הצטרף האחרון</p>
+            {filteredCoords.map(c=>{
+              const e=localMembers[c.coordKey]||{};
+              return (
+                <div key={c.coordKey} style={{padding:"10px 0",borderBottom:"1px solid #e8ede9"}}>
+                  <div style={{fontSize:13,fontWeight:700,marginBottom:7}}><CoordName name={c.coordName}/> <span style={{color:"#6b7280",fontWeight:400,fontSize:11}}>— {c.city}</span></div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    <input type="number" min={0} placeholder="מס׳ חברים" value={e.count||""}
+                      onChange={ev=>setLocalMembers(prev=>({...prev,[c.coordKey]:{...( prev[c.coordKey]||{}),count:parseInt(ev.target.value)||0}}))}
+                      style={S.input}/>
+                    <input type="date" value={e.lastJoined||""}
+                      onChange={ev=>setLocalMembers(prev=>({...prev,[c.coordKey]:{...(prev[c.coordKey]||{}),lastJoined:ev.target.value}}))}
+                      style={{...S.input,direction:"ltr"}}/>
+                  </div>
+                </div>
+              );
+            })}
+            <button style={{...S.btn,marginTop:14}} onClick={()=>{
+              const ts=new Date().toISOString();
+              const withTs=Object.fromEntries(Object.entries(localMembers).map(([k,v])=>[k,{...v,lastUpdated:ts}]));
+              setLocalMembers(withTs);
+              onSaveMemberData(withTs);
+            }}>💾 שמור חברי קבוצות</button>
+          </Card>
+
           <Card>
             <p style={{...T.cardTitle,marginBottom:14}}>⏰ שעות חלוקה</p>
             {filteredCoords.map(c=>(
@@ -629,7 +684,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
 // ══════════════════════════════════════════════
 // COORDINATOR SCREEN — same as v5
 // ══════════════════════════════════════════════
-function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast,showToast,updatedAt,history}) {
+function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast,showToast,updatedAt,history,memberEntry}) {
   if(!coord) return null;
   const totalRev=coord.orders.reduce((s,o)=>s+o.total,0);
   const orderCount=coord.orders.length;
@@ -694,8 +749,20 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
           {updatedAt&&<span>עודכן {new Date(updatedAt).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})} · </span>}
           <span>מתעדכן בכל יום ב-08:00, 13:00, 19:00</span>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:12}}>
-        </div>
+        {memberEntry?.count>0&&(
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:10}}>
+            <div style={{background:"rgba(255,255,255,.11)",borderRadius:10,padding:"10px",textAlign:"center"}}>
+              <div style={{fontSize:20,fontWeight:900,color:"#ffd166"}}>{memberEntry.count}</div>
+              <div style={{fontSize:10,opacity:.8}}>חברים בקבוצה</div>
+            </div>
+            {memberEntry.lastJoined&&(
+              <div style={{background:"rgba(255,255,255,.11)",borderRadius:10,padding:"10px",textAlign:"center"}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#ffd166",direction:"ltr"}}>{memberEntry.lastJoined}</div>
+                <div style={{fontSize:10,opacity:.8}}>הצטרפות אחרונה</div>
+              </div>
+            )}
+          </div>
+        )}
         <div style={{marginTop:12}}>
           {isRegular ? (<>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:4}}>
