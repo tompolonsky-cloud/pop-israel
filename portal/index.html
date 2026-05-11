@@ -767,20 +767,28 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
           {pilot.status==="regular"&&<div style={{background:"rgba(255,255,255,.2)",color:"#fff",fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:99}}>✅ נקודה קבועה</div>}
         </div>
         <div style={{fontSize:13,opacity:.7,marginTop:2}}>📍 {coord.city||coord.deliveryStr}</div>
-        {(pilot.status==="pilot"||history?.length>0)&&(
-          <div style={{marginTop:14}}>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:6}}>
-              <span>📅 {pilot.status==="pilot"?"פיילוט":"שבועות פעילות"}</span>
-              <span>{pilot.status==="pilot"?`שבוע ${pilot.week} מתוך 4`:`שבוע ${history.length}`}</span>
+        {(()=>{
+          const activeWeeks = pilot.status==="pilot" ? pilot.week : Math.max((history?.length||0)+1, 1);
+          const isPilot = pilot.status==="pilot";
+          const bars = isPilot ? 4 : Math.min(activeWeeks, 8);
+          return (
+            <div style={{marginTop:14}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:6}}>
+                <span>📅 {isPilot?"פיילוט":"שבועות פעילות"}</span>
+                <span>{isPilot?`שבוע ${pilot.week} מתוך 4`:`שבוע ${activeWeeks}`}</span>
+              </div>
+              <div style={{display:"flex",gap:5}}>
+                {Array.from({length:bars}).map((_,i)=>(
+                  <div key={i} style={{flex:1,height:8,borderRadius:99,
+                    background: isPilot
+                      ? (i+1<pilot.week?"#86efac":i+1===pilot.week?"#ffd166":"rgba(255,255,255,.2)")
+                      : "#86efac",
+                    transition:"background .3s"}}/>
+                ))}
+              </div>
             </div>
-            <div style={{display:"flex",gap:5}}>
-              {pilot.status==="pilot"
-                ?[1,2,3,4].map(w=><div key={w} style={{flex:1,height:8,borderRadius:99,background:w<pilot.week?"#86efac":w===pilot.week?"#ffd166":"rgba(255,255,255,.2)",transition:"background .3s"}}/>)
-                :Array.from({length:Math.min(history.length,8)}).map((_,i)=><div key={i} style={{flex:1,height:8,borderRadius:99,background:"#86efac"}}/>)
-              }
-            </div>
-          </div>
-        )}
+          );
+        })()}
         <div style={{marginTop:10,fontSize:10,opacity:.5,textAlign:"center"}}>
           {updatedAt&&<span>עודכן {new Date(updatedAt).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})} · </span>}
           <span>מתעדכן בכל יום ב-08:00, 13:00, 19:00</span>
