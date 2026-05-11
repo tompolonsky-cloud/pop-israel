@@ -183,18 +183,23 @@ function extractFirstName(coordKey) {
 
 function mergeCoordsWithList(coords, allCoords) {
   if (!allCoords || allCoords.length === 0) return coords;
-  // Start from the master sheet list, attach orders data where it exists
-  return allCoords.map(sheetCoord => {
+  const matched = new Set();
+  // Start from sheet list, attach orders where matched
+  const result = allCoords.map(sheetCoord => {
     const sheetFirst = sheetCoord.coordKey.split('-')[0].replace(/[''']/g, '');
     const match = coords.find(c =>
       c.coordKey === sheetCoord.coordKey ||
       extractFirstName(c.coordKey) === sheetFirst
     );
     if (match) {
+      matched.add(match.coordKey);
       return { ...sheetCoord, orders: match.orders, coordPhone: match.coordPhone, deliveryStr: match.deliveryStr };
     }
     return { ...sheetCoord, orders: [], coordPhone: '' };
   });
+  // Add order coords not matched to any sheet coord (so their orders aren't lost)
+  const orphans = coords.filter(c => !matched.has(c.coordKey));
+  return [...result, ...orphans];
 }
 function CoordName({name, style={}}) {
   return <span dir="auto" style={{unicodeBidi:'plaintext',...style}}>{name}</span>;
