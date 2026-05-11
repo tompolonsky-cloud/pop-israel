@@ -220,9 +220,8 @@ function mergeCoordsWithList(coords, allCoords) {
     }
     return { ...sheetCoord, orders: [], coordPhone: '' };
   });
-  // Add unmatched order coords so their orders aren't lost
   const orphans = coords.filter(c => !matched.has(c.coordKey));
-  return [...result, ...orphans];
+  return [...result, ...orphans].filter(c => c.coordName && c.coordName.trim() && c.coordName !== '0');
 }
 function CoordName({name, style={}}) {
   return <span dir="auto" style={{unicodeBidi:'plaintext',...style}}>{name}</span>;
