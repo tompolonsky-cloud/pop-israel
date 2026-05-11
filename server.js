@@ -4,8 +4,9 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA_FILE  = path.join(__dirname, 'data', 'latest.json');
-const COORD_FILE = path.join(__dirname, 'data', 'coordinators.json');
+const DATA_FILE     = path.join(__dirname, 'data', 'latest.json');
+const COORD_FILE    = path.join(__dirname, 'data', 'coordinators.json');
+const SETTINGS_FILE = path.join(__dirname, 'data', 'settings.json');
 
 fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
 
@@ -27,10 +28,27 @@ if (fs.existsSync(COORD_FILE)) {
   try { coordList = JSON.parse(fs.readFileSync(COORD_FILE, 'utf-8')); } catch(e) {}
 }
 
+let settings = { times: {}, drivers: {}, waLinks: {}, week: { num: 1, label: 'שבוע 1', openedAt: null } };
+if (fs.existsSync(SETTINGS_FILE)) {
+  try { settings = { ...settings, ...JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8')) }; } catch(e) {}
+}
+
 // ── GET /api/data — portal reads this on startup
 app.get('/api/data', (req, res) => {
   if (!latestData && coordList.length === 0) return res.json({ empty: true });
   res.json({ ...(latestData || { updatedAt: null, coords: [] }), coordinators: coordList });
+});
+
+// ── GET /api/settings — portal reads secretary settings
+app.get('/api/settings', (req, res) => res.json(settings));
+
+// ── POST /api/settings — secretary page saves settings here
+app.post('/api/settings', (req, res) => {
+  if (typeof req.body !== 'object' || Array.isArray(req.body)) return res.status(400).json({ error: 'invalid' });
+  settings = { ...settings, ...req.body };
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+  console.log(`⚙️  הגדרות עודכנו`);
+  res.json({ ok: true });
 });
 
 // ── POST /api/coordinators — refresh.js posts active coordinator list here

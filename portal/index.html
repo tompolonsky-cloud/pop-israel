@@ -223,6 +223,8 @@ function App() {
 
   async function init(cp) {
     setView("loading");
+
+    // Load from localStorage as initial fallback
     const t  = sto_get(K_TIMES);
     const w  = sto_get(K_WEEK);
     const n  = sto_get(K_NOTIFS);
@@ -235,6 +237,16 @@ function App() {
     if(p)  setProgress(p);
     if(dr) setDrivers(dr);
     if(wl) setWaLinks(wl);
+
+    // Fetch server settings (secretary writes here, all portals read)
+    try {
+      const sr = await fetch('/api/settings');
+      const sv = await sr.json();
+      if (sv.times   && Object.keys(sv.times).length)   { setTimes(sv.times);     sto_set(K_TIMES,   sv.times);   }
+      if (sv.drivers && Object.keys(sv.drivers).length)  { setDrivers(sv.drivers); sto_set(K_DRIVERS, sv.drivers); }
+      if (sv.waLinks && Object.keys(sv.waLinks).length)  { setWaLinks(sv.waLinks); sto_set(K_WALINKS, sv.waLinks); }
+      if (sv.week?.num) { setWeek(sv.week); sto_set(K_WEEK, sv.week); }
+    } catch(e) {}
 
     try {
       const res  = await fetch('/api/data');
@@ -264,9 +276,13 @@ function App() {
 
   function showToast(msg,dur=3000){setToast(msg);setTimeout(()=>setToast(""),dur);}
 
-  async function saveTimes(t)  { setTimes(t);   sto_set(K_TIMES,t);   showToast("✅ שעות נשמרו"); }
-  async function saveDrivers(dr){ setDrivers(dr); sto_set(K_DRIVERS,dr); showToast("✅ נהגים נשמרו"); }
-  async function saveWaLinks(wl){ setWaLinks(wl); sto_set(K_WALINKS,wl); showToast("✅ לינקי קבוצה נשמרו"); }
+  async function postSettings(patch) {
+    try { await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(patch) }); } catch(e) {}
+  }
+
+  async function saveTimes(t)  { setTimes(t);   sto_set(K_TIMES,t);   await postSettings({times:t});   showToast("✅ שעות נשמרו"); }
+  async function saveDrivers(dr){ setDrivers(dr); sto_set(K_DRIVERS,dr); await postSettings({drivers:dr}); showToast("✅ נהגים נשמרו"); }
+  async function saveWaLinks(wl){ setWaLinks(wl); sto_set(K_WALINKS,wl); await postSettings({waLinks:wl}); showToast("✅ לינקי קבוצה נשמרו"); }
 
   async function fireNotif(coord) {
     const t=times[coord.coordKey]||"17:00";
@@ -275,6 +291,7 @@ function App() {
     const newWeek={...week,openedAt:Date.now()};
     setNotifs(newN); setWeek(newWeek);
     sto_set(K_NOTIFS,newN); sto_set(K_WEEK,newWeek);
+    postSettings({week:newWeek});
     navigator.clipboard.writeText(msg).then(()=>showToast("🔔 הודעת פתיחה הועתקה — הדבק בקבוצה!"));
   }
 
