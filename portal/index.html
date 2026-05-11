@@ -121,6 +121,37 @@ function isUrgent() {
   return false;
 }
 
+function getActiveReminders(pilot) {
+  const now  = new Date();
+  const day  = now.getDay(); // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
+  const hour = now.getHours();
+  const out  = [];
+
+  // ח'-ראשון 16:00 עד ראשון 18:00 — הזמנת משתתפים חדשים
+  const isInviteWindow = (day===4&&hour>=16)||day===5||day===6||(day===0&&hour<18);
+  if (isInviteWindow) out.push({
+    id:'invite', color:'#7c3aed',
+    title:'🙋 הזמן/י משתתפים חדשים',
+    body:'עכשיו חלון הזמן להזמין חברים, שכנים ומשפחה לקבוצה לפני פתיחת ההזמנות ביום ראשון.',
+  });
+
+  // שני בבוקר (לפני 14:00) — הזמן סל רכזים
+  if (day===1&&hour<14) out.push({
+    id:'basket', color:'#d97706',
+    title:'🧺 הזמן/י את הסל שלך',
+    body:'היום יום שני — זה הזמן להזמין לעצמך סל רכזים לשבוע הבא.',
+  });
+
+  // שבוע 2 בפיילוט, ימים א–ד — בקשת משוב על הסחורה
+  if (pilot?.status==='pilot'&&pilot.week===2&&day>=0&&day<=4) out.push({
+    id:'feedback', color:'#059669',
+    title:'💬 שתף/י משוב על הסחורה',
+    body:'קיבלת את הסל הראשון שלך השבוע שעבר — מה אהבת? מה פחות? שלח/י לנו פידבק.',
+  });
+
+  return out;
+}
+
 function matchCoord(coords, cp) {
   const s = slugify(cp);
   const first = s.split('-')[0];
@@ -471,8 +502,11 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
   const totalRev=coord.orders.reduce((s,o)=>s+o.total,0);
   const orderCount=coord.orders.length;
   const MIN_ORDERS=5;
-  const belowMin=orderCount<MIN_ORDERS && isUrgent();
+  const MIN_REV=1000;
   const pilot=pilotInfo(coord.launchDate);
+  const isRegular=pilot.status==='regular';
+  const belowMin=isUrgent()&&(isRegular ? totalRev<MIN_REV : orderCount<MIN_ORDERS);
+  const activeReminders=getActiveReminders(pilot);
   const missing=MIN_ORDERS-orderCount;
 
   useEffect(()=>{
@@ -487,7 +521,9 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
     }
   },[]);
 
-  const boostMsg=`חברים, יש לנו ${orderCount} הזמנות השבוע — אנחנו צריכים לפחות ${MIN_ORDERS} כדי שהחלוקה תגיע אלינו! 🥺\n\nמי שעוד לא הזמין — זה הרגע! ⏰\n${getStoreLink()}\n\nומי שיכול להמליץ לשכן/ה — תעשו טוב 🙏\nיחד נגיע ליעד! 🌿`;
+  const boostMsg=isRegular
+    ?`חברים, הגענו ל-₪${totalRev.toLocaleString('he-IL')} השבוע — אנחנו צריכים לפחות ₪${MIN_REV} 🥺\n\nמי שעוד לא הזמין — זה הרגע! ⏰\n${getStoreLink()}\n\nומי שיכול להמליץ לשכן/ה — תעשו טוב 🙏\nיחד נגיע ליעד! 🌿`
+    :`חברים, יש לנו ${orderCount} הזמנות השבוע — אנחנו צריכים לפחות ${MIN_ORDERS} כדי שהחלוקה תגיע אלינו! 🥺\n\nמי שעוד לא הזמין — זה הרגע! ⏰\n${getStoreLink()}\n\nומי שיכול להמליץ לשכן/ה — תעשו טוב 🙏\nיחד נגיע ליעד! 🌿`;
 
   return (
     <Screen>
@@ -529,12 +565,21 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:12}}>
         </div>
         <div style={{marginTop:12}}>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:4}}>
-            <span>התקדמות לחלוקה</span><span>{orderCount} / {MIN_ORDERS} מינימום</span>
-          </div>
-          <div style={{background:"rgba(255,255,255,.2)",borderRadius:99,height:8}}>
-            <div style={{width:Math.min(100,(orderCount/MIN_ORDERS)*100)+"%",height:"100%",background:belowMin?"#fca5a5":"#86efac",borderRadius:99,transition:"width .5s"}}/>
-          </div>
+          {isRegular ? (<>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:4}}>
+              <span>הכנסות שבועיות</span><span>₪{totalRev.toLocaleString('he-IL')} / ₪{MIN_REV} מינימום</span>
+            </div>
+            <div style={{background:"rgba(255,255,255,.2)",borderRadius:99,height:8}}>
+              <div style={{width:Math.min(100,(totalRev/MIN_REV)*100)+"%",height:"100%",background:belowMin?"#fca5a5":"#86efac",borderRadius:99,transition:"width .5s"}}/>
+            </div>
+          </>) : (<>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:4}}>
+              <span>התקדמות לחלוקה</span><span>{orderCount} / {MIN_ORDERS} מינימום</span>
+            </div>
+            <div style={{background:"rgba(255,255,255,.2)",borderRadius:99,height:8}}>
+              <div style={{width:Math.min(100,(orderCount/MIN_ORDERS)*100)+"%",height:"100%",background:belowMin?"#fca5a5":"#86efac",borderRadius:99,transition:"width .5s"}}/>
+            </div>
+          </>)}
         </div>
       </div>
 
@@ -542,7 +587,10 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
         <div style={{background:"#fef2f2",border:"1.5px solid #fca5a5",margin:"12px 14px 0",borderRadius:12,padding:"14px"}}>
           <p style={{fontSize:14,fontWeight:800,color:"#991b1b",marginBottom:6}}>⚠️ סכנה — החלוקה עלולה לא להגיע!</p>
           <p style={{fontSize:12,color:"#7f1d1d",lineHeight:1.6,marginBottom:12}}>
-            יש לך {orderCount} הזמנות. צריך לפחות {MIN_ORDERS}.<br/><strong>שלח/י עכשיו לקבוצה:</strong>
+            {isRegular
+              ?<>הגעת ל-₪{totalRev.toLocaleString('he-IL')}. צריך לפחות ₪{MIN_REV}.<br/><strong>שלח/י עכשיו לקבוצה:</strong></>
+              :<>יש לך {orderCount} הזמנות. צריך לפחות {MIN_ORDERS}.<br/><strong>שלח/י עכשיו לקבוצה:</strong></>
+            }
           </p>
           <CopyBtnSimple text={boostMsg} label="📋 העתק הודעת דחיפה"/>
           {waGroupLink&&<a href={waGroupLink} target="_blank" style={{display:"block",marginTop:8,background:"#25d366",color:"#fff",padding:"9px",borderRadius:9,textAlign:"center",textDecoration:"none",fontWeight:700,fontSize:13}}>
@@ -554,15 +602,16 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
       <div style={{background:"#fff",borderBottom:"1px solid #e8ede9",display:"flex",marginTop:belowMin?12:0}}>
         {[["orders","📋"],["messages","📤"],["reminders","🔔"],["faq","❓"]].map(([k,l])=>(
           <div key={k} onClick={()=>setTab(k)}
-            style={{flex:1,padding:"12px 4px",textAlign:"center",fontSize:20,color:tab===k?(belowMin?"#b91c1c":"#2d6a4f"):"#9ca3af",borderBottom:tab===k?`2px solid ${belowMin?"#b91c1c":"#2d6a4f"}`:"2px solid transparent",cursor:"pointer"}}>
+            style={{flex:1,padding:"12px 4px",textAlign:"center",fontSize:20,color:tab===k?(belowMin?"#b91c1c":"#2d6a4f"):"#9ca3af",borderBottom:tab===k?`2px solid ${belowMin?"#b91c1c":"#2d6a4f"}`:"2px solid transparent",cursor:"pointer",position:"relative"}}>
             {l}
+            {k==="reminders"&&activeReminders.length>0&&<span style={{position:"absolute",top:6,right:"calc(50% - 18px)",background:"#e63946",color:"#fff",borderRadius:99,fontSize:10,fontWeight:900,padding:"1px 5px",lineHeight:1.4}}>{activeReminders.length}</span>}
           </div>
         ))}
       </div>
       <Body>
         {tab==="orders"    && <OrdersTab coord={coord} time={time} showToast={showToast}/>}
         {tab==="messages"  && <MessagesTab coord={coord} time={time} week={week} pilot={pilot} driver={driver} waGroupLink={waGroupLink} showToast={showToast}/>}
-        {tab==="reminders" && <RemindersTab coord={coord} pilot={pilot} waGroupLink={waGroupLink} showToast={showToast}/>}
+        {tab==="reminders" && <RemindersTab coord={coord} pilot={pilot} activeReminders={activeReminders} waGroupLink={waGroupLink} showToast={showToast}/>}
         {tab==="faq"       && <FaqTab/>}
       </Body>
       <Toast msg={toast}/>
@@ -687,12 +736,18 @@ function FaqTab() {
   );
 }
 
-function RemindersTab({coord,pilot,waGroupLink,showToast}) {
+function RemindersTab({coord,pilot,activeReminders,waGroupLink,showToast}) {
   const [notifGranted,setNotifGranted]=useState(typeof Notification!=="undefined"?Notification.permission==="granted":false);
   async function requestNotif(){const perm=await Notification.requestPermission();setNotifGranted(perm==="granted");showToast(perm==="granted"?"✅ נוטיפיקציות פעילות!":"⚠️ לא אושר");}
   function testNotif(){if(!notifGranted){showToast("⚠️ אשר קודם");return;}new Notification("🌿 תזכורת פופ ישראל",{body:"החנות פתוחה! הזמן עכשיו ✅"});}
   const pilotMsg=buildPilotMsg(coord,waGroupLink);
   return <>
+    {(activeReminders||[]).map(r=>(
+      <div key={r.id} style={{background:"#fff",borderRadius:14,padding:"14px 16px",marginBottom:10,borderRight:`4px solid ${r.color}`,boxShadow:"0 2px 10px rgba(0,0,0,.07)"}}>
+        <div style={{fontSize:14,fontWeight:800,color:"#1a3c2e",marginBottom:4}}>{r.title}</div>
+        <div style={{fontSize:13,color:"#374151",lineHeight:1.6}}>{r.body}</div>
+      </div>
+    ))}
     <Card style={{borderRight:"4px solid #2d6a4f"}}>
       <p style={{...T.cardTitle,marginBottom:6}}>📅 תזכורת שבועית</p>
       {!notifGranted
