@@ -23,9 +23,13 @@ if (fs.existsSync(DATA_FILE)) {
   } catch(e) {}
 }
 
+function readJSON(file) {
+  return JSON.parse(fs.readFileSync(file, 'utf-8').replace(/^﻿/, ''));
+}
+
 let coordList = [];
 if (fs.existsSync(COORD_FILE)) {
-  try { coordList = JSON.parse(fs.readFileSync(COORD_FILE, 'utf-8')); } catch(e) {}
+  try { coordList = readJSON(COORD_FILE); } catch(e) {}
 }
 
 let settings = { times: {}, drivers: {}, waLinks: {}, week: { num: 1, label: 'שבוע 1', openedAt: null } };
@@ -35,6 +39,9 @@ if (fs.existsSync(SETTINGS_FILE)) {
 
 // ── GET /api/data — portal reads this on startup
 app.get('/api/data', (req, res) => {
+  if (fs.existsSync(COORD_FILE)) {
+    try { coordList = readJSON(COORD_FILE); } catch(e) {}
+  }
   if (!latestData && coordList.length === 0) return res.json({ empty: true });
   res.json({ ...(latestData || { updatedAt: null, coords: [] }), coordinators: coordList });
 });

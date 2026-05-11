@@ -173,13 +173,28 @@ function matchCoord(coords, cp) {
   );
 }
 
+function extractFirstName(coordKey) {
+  // "שורשים--טליה" → "טליה", "כרמיאל--מכוש-מירב" → "מירב", "רחלי" → "רחלי"
+  const parts = coordKey.split('--');
+  const namePart = parts[parts.length - 1];
+  const words = namePart.split('-').filter(Boolean);
+  return (words[words.length - 1] || coordKey).replace(/[''']/g, '');
+}
+
 function mergeCoordsWithList(coords, allCoords) {
-  const usedKeys = new Set(coords.map(c => c.coordKey));
-  const usedFirsts = new Set(coords.map(c => slugify(c.coordName).split('-')[0]));
-  const extras = allCoords
-    .filter(c => !usedKeys.has(c.coordKey) && !usedFirsts.has(c.coordKey.split('-')[0]))
-    .map(c => ({ ...c, orders: [], coordPhone: '' }));
-  return [...coords, ...extras];
+  if (!allCoords || allCoords.length === 0) return coords;
+  // Start from the master sheet list, attach orders data where it exists
+  return allCoords.map(sheetCoord => {
+    const sheetFirst = sheetCoord.coordKey.split('-')[0].replace(/[''']/g, '');
+    const match = coords.find(c =>
+      c.coordKey === sheetCoord.coordKey ||
+      extractFirstName(c.coordKey) === sheetFirst
+    );
+    if (match) {
+      return { ...sheetCoord, orders: match.orders, coordPhone: match.coordPhone, deliveryStr: match.deliveryStr };
+    }
+    return { ...sheetCoord, orders: [], coordPhone: '' };
+  });
 }
 function fmtPhone(p) {
   if(!p||p.length<9) return p||"";

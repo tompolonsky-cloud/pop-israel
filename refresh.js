@@ -11,6 +11,8 @@ const PROFILE_DIR  = path.join(__dirname, 'data', 'browser-profile');
 const MYPIPS_URL   = 'https://mypips.app/popisrael/manager/finalized-orders';
 const CLOUD_URL    = 'https://pop-israel-production.up.railway.app/api/update';
 const CLOUD_COORD  = 'https://pop-israel-production.up.railway.app/api/coordinators';
+const LOCAL_URL    = 'http://localhost:3000/api/update';
+const LOCAL_COORD  = 'http://localhost:3000/api/coordinators';
 const SHEET_URL    = 'https://docs.google.com/spreadsheets/d/1nZTvoIH4kuRZt6haicg-UWt9D5_ET4d1LaNeAgszzyc/export?format=csv&gid=0';
 
 async function main() {
@@ -70,8 +72,8 @@ async function main() {
 
     await context.close();
 
-    // Send to local server
-    await postCSV(csv);
+    // Send to local + cloud
+    await Promise.allSettled([postData(LOCAL_URL, csv, 'text/plain'), postData(CLOUD_URL, csv, 'text/plain')]);
 
     console.log(`✅ עודכן בהצלחה [${new Date().toLocaleString('he-IL')}]`);
     console.log(`   שורות: ${csv.split('\n').length - 1}`);
@@ -81,7 +83,7 @@ async function main() {
     try {
       const coords = sheetCsv ? parseSheetCoords(sheetCsv) : JSON.parse(fs.readFileSync(LOCAL_COORD, 'utf-8'));
       if (sheetCsv) fs.writeFileSync(LOCAL_COORD, JSON.stringify(coords, null, 2));
-      await postJSON(CLOUD_COORD, coords);
+      await Promise.allSettled([postJSON(LOCAL_COORD, coords), postJSON(CLOUD_COORD, coords)]);
       console.log(`   רכזים פעילים: ${coords.length}${sheetCsv ? ' (עודכן מהגיליון)' : ' (מקובץ מקומי)'}`);
     } catch(e) {
       console.warn(`   ⚠️ לא עודכנה רשימת רכזים: ${e.message}`);
@@ -146,46 +148,25 @@ function parseSheetLine(line) {
 
 function slugifyStr(s) { return (s || '').trim().replace(/\s+/g, '-'); }
 
-function postJSON(url, data) {
-  return new Promise((resolve, reject) => {
-    const buf = Buffer.from(JSON.stringify(data), 'utf-8');
-    const u = new URL(url);
-    const req = https.request({
-      hostname: u.hostname,
-      path: u.pathname,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': buf.length },
-    }, res => {
-      let body = '';
-      res.on('data', d => body += d);
-      res.on('end', () => resolve(JSON.parse(body)));
-    });
-    req.on('error', reject);
-    req.write(buf);
-    req.end();
-  });
+function postJSON(urlStr, data) {
+  return postData(urlStr, JSON.stringify(data), 'application/json');
 }
 
-function postCSV(csv) {
+function postData(urlStr, body, contentType) {
   return new Promise((resolve, reject) => {
-    const buf = Buffer.from(csv, 'utf-8');
-    const url = new URL(CLOUD_URL);
-    const req = https.request({
-      hostname: url.hostname,
-      path: url.pathname,
+    const buf = Buffer.from(body, 'utf-8');
+    const u = new URL(urlStr);
+    const lib = u.protocol === 'https:' ? https : require('http');
+    const req = lib.request({
+      hostname: u.hostname,
+      port: u.port || (u.protocol === 'https:' ? 443 : 80),
+      path: u.pathname,
       method: 'POST',
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Content-Length': buf.length,
-      },
+      headers: { 'Content-Type': contentType, 'Content-Length': buf.length },
     }, res => {
-      let body = '';
-      res.on('data', d => body += d);
-      res.on('end', () => {
-        const json = JSON.parse(body);
-        console.log(`   רכזים: ${json.coordCount}`);
-        resolve();
-      });
+      let b = '';
+      res.on('data', d => b += d);
+      res.on('end', () => { try { resolve(JSON.parse(b)); } catch(e) { resolve({}); } });
     });
     req.on('error', reject);
     req.write(buf);
