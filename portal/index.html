@@ -526,18 +526,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
             })}
           </Card>
 
-          <Card>
-            <p style={{...T.cardTitle,marginBottom:10}}>🎯 יעד קבוצה — {GROUP_TARGET} חברים</p>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-              <div style={{flex:1,background:"#e8ede9",borderRadius:99,height:12,overflow:"hidden"}}>
-                <div style={{width:membersPct+"%",height:"100%",background:"linear-gradient(90deg,#2d6a4f,#52b788)",borderRadius:99,transition:"width 1s"}}/>
-              </div>
-              <span style={{fontSize:14,fontWeight:900,color:"#2d6a4f",minWidth:38}}>{membersPct}%</span>
-            </div>
-            <div style={{fontSize:11,color:"#6b7280",textAlign:"center"}}>{totalGroupMembers} / {GROUP_TARGET} חברים בסך הכל</div>
-          </Card>
-
-          {staleCoords.length>0&&(
+{staleCoords.length>0&&(
             <Card style={{borderRight:"4px solid #f59e0b"}}>
               <p style={{...T.cardTitle,marginBottom:10,color:"#b45309"}}>⚠️ טרם עודכן — חברי קבוצה</p>
               <p style={{fontSize:11,color:"#78350f",marginBottom:10}}>הרכזים הבאים לא עודכנו השבוע. עדכני ב-👥 טאב "רכזים":</p>
@@ -738,17 +727,14 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
           <span>מתעדכן בכל יום ב-08:00, 13:00, 19:00</span>
         </div>
         {memberEntry?.count>0&&(
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:10}}>
-            <div style={{background:"rgba(255,255,255,.11)",borderRadius:10,padding:"10px",textAlign:"center"}}>
-              <div style={{fontSize:20,fontWeight:900,color:"#ffd166"}}>{memberEntry.count}</div>
-              <div style={{fontSize:10,opacity:.8}}>חברים בקבוצה</div>
+          <div style={{marginTop:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:4}}>
+              <span>👥 חברי קבוצת וואטסאפ{memberEntry.lastJoined?` · הצטרף אחרון: ${memberEntry.lastJoined}`:""}</span>
+              <span>{memberEntry.count} / {GROUP_TARGET}</span>
             </div>
-            {memberEntry.lastJoined&&(
-              <div style={{background:"rgba(255,255,255,.11)",borderRadius:10,padding:"10px",textAlign:"center"}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#ffd166",direction:"ltr"}}>{memberEntry.lastJoined}</div>
-                <div style={{fontSize:10,opacity:.8}}>הצטרפות אחרונה</div>
-              </div>
-            )}
+            <div style={{background:"rgba(255,255,255,.2)",borderRadius:99,height:8}}>
+              <div style={{width:Math.min(100,(memberEntry.count/GROUP_TARGET)*100)+"%",height:"100%",background:"#ffd166",borderRadius:99,transition:"width .5s"}}/>
+            </div>
           </div>
         )}
         <div style={{marginTop:12}}>
