@@ -4,7 +4,8 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'data', 'latest.json');
+const DATA_FILE  = path.join(__dirname, 'data', 'latest.json');
+const COORD_FILE = path.join(__dirname, 'data', 'coordinators.json');
 
 fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
 
@@ -21,10 +22,25 @@ if (fs.existsSync(DATA_FILE)) {
   } catch(e) {}
 }
 
+let coordList = [];
+if (fs.existsSync(COORD_FILE)) {
+  try { coordList = JSON.parse(fs.readFileSync(COORD_FILE, 'utf-8')); } catch(e) {}
+}
+
 // ── GET /api/data — portal reads this on startup
 app.get('/api/data', (req, res) => {
-  if (!latestData) return res.json({ empty: true });
-  res.json(latestData);
+  if (!latestData && coordList.length === 0) return res.json({ empty: true });
+  res.json({ ...(latestData || { updatedAt: null, coords: [] }), coordinators: coordList });
+});
+
+// ── POST /api/coordinators — refresh.js posts active coordinator list here
+app.post('/api/coordinators', (req, res) => {
+  const list = Array.isArray(req.body) ? req.body : null;
+  if (!list) return res.status(400).json({ error: 'invalid' });
+  coordList = list;
+  fs.writeFileSync(COORD_FILE, JSON.stringify(list, null, 2));
+  console.log(`📋 רכזים עודכנו — ${list.length} פעילות`);
+  res.json({ ok: true, count: list.length });
 });
 
 // ── POST /api/update — refresh.js posts CSV here

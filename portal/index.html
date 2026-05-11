@@ -92,6 +92,34 @@ const K_WALINKS  = "pop_v6_walinks";
 // HELPERS
 // ══════════════════════════════════════════════
 function slugify(s="") { return s.trim().replace(/\s+/g,"-"); }
+
+function isUrgent() {
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu
+  const hour = now.getHours();
+  if (day === 2 && hour >= 13) return true;
+  if (day === 3 || day === 4) return true;
+  return false;
+}
+
+function matchCoord(coords, cp) {
+  const s = slugify(cp);
+  const first = s.split('-')[0];
+  return coords.find(x =>
+    x.coordKey === s ||
+    slugify(x.coordName) === s ||
+    (first.length > 1 && (slugify(x.coordName).startsWith(first + '-') || x.coordKey.startsWith(first + '-')))
+  );
+}
+
+function mergeCoordsWithList(coords, allCoords) {
+  const usedKeys = new Set(coords.map(c => c.coordKey));
+  const usedFirsts = new Set(coords.map(c => slugify(c.coordName).split('-')[0]));
+  const extras = allCoords
+    .filter(c => !usedKeys.has(c.coordKey) && !usedFirsts.has(c.coordKey.split('-')[0]))
+    .map(c => ({ ...c, orders: [], coordPhone: '' }));
+  return [...coords, ...extras];
+}
 function fmtPhone(p) {
   if(!p||p.length<9) return p||"";
   if(p.startsWith("0")&&p.length===10) return `${p.slice(0,3)}-${p.slice(3,6)}-${p.slice(6)}`;
@@ -145,7 +173,6 @@ function App() {
 
   async function init(cp) {
     setView("loading");
-    // Load settings from localStorage
     const t  = sto_get(K_TIMES);
     const w  = sto_get(K_WEEK);
     const n  = sto_get(K_NOTIFS);
@@ -159,15 +186,21 @@ function App() {
     if(dr) setDrivers(dr);
     if(wl) setWaLinks(wl);
 
-    // Fetch latest data from server
     try {
       const res  = await fetch('/api/data');
       const data = await res.json();
-      if (data.coords && data.coords.length > 0) {
-        setCoords(data.coords);
+      if (!data.empty) {
+        const orderCoords = data.coords || [];
+        const sheetCoords = data.coordinators || [];
+        const merged = mergeCoordsWithList(orderCoords, sheetCoords);
+        setCoords(merged);
         setUpdatedAt(data.updatedAt);
         if (cp) {
-          const found = data.coords.find(x => slugify(x.coordName)===slugify(cp) || x.coordKey===cp);
+          let found = matchCoord(orderCoords, cp);
+          if (!found) {
+            const fromSheet = sheetCoords.find(x => x.coordKey===slugify(cp) || slugify(x.coordName)===slugify(cp));
+            if (fromSheet) found = { ...fromSheet, orders: [], coordPhone: '' };
+          }
           if (found) { setSelCoord(found); setView("coord"); return; }
           setView("error"); return;
         }
@@ -419,7 +452,7 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
   const totalRev=coord.orders.reduce((s,o)=>s+o.total,0);
   const orderCount=coord.orders.length;
   const MIN_ORDERS=5;
-  const belowMin=orderCount<MIN_ORDERS;
+  const belowMin=orderCount<MIN_ORDERS && isUrgent();
   const missing=MIN_ORDERS-orderCount;
 
   useEffect(()=>{

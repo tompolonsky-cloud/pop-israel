@@ -3,13 +3,15 @@
  * מופעל אוטומטית 3 פעמים ביום על ידי Task Scheduler
  */
 const { chromium } = require('playwright');
-const fs   = require('fs');
-const path = require('path');
-const http = require('http');
+const fs    = require('fs');
+const path  = require('path');
+const https = require('https');
 
-const PROFILE_DIR = path.join(__dirname, 'data', 'browser-profile');
-const MYPIPS_URL  = 'https://mypips.app/popisrael/manager/finalized-orders';
-const SERVER_PORT = 3000;
+const PROFILE_DIR  = path.join(__dirname, 'data', 'browser-profile');
+const MYPIPS_URL   = 'https://mypips.app/popisrael/manager/finalized-orders';
+const CLOUD_URL    = 'https://pop-israel-production.up.railway.app/api/update';
+const CLOUD_COORD  = 'https://pop-israel-production.up.railway.app/api/coordinators';
+const SHEET_URL    = 'https://docs.google.com/spreadsheets/d/1nZTvoIH4kuRZt6haicg-UWt9D5_ET4d1LaNeAgszzyc/export?format=csv&gid=0';
 
 async function main() {
   const ts = new Date().toLocaleString('he-IL');
@@ -65,6 +67,16 @@ async function main() {
     console.log(`✅ עודכן בהצלחה [${new Date().toLocaleString('he-IL')}]`);
     console.log(`   שורות: ${csv.split('\n').length - 1}`);
 
+    // גם מעדכן רשימת רכזים מהגיליון
+    try {
+      const sheetCsv = await fetchUrl(SHEET_URL);
+      const coords = parseSheetCoords(sheetCsv);
+      await postJSON(CLOUD_COORD, coords);
+      console.log(`   רכזים פעילים: ${coords.length}`);
+    } catch(e) {
+      console.warn(`   ⚠️ לא עודכנה רשימת רכזים: ${e.message}`);
+    }
+
   } catch (err) {
     await context.close();
     console.error(`❌ שגיאה: ${err.message}`);
@@ -72,13 +84,79 @@ async function main() {
   }
 }
 
+function fetchUrl(url, redirects = 5) {
+  return new Promise((resolve, reject) => {
+    https.get(url, res => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects > 0) {
+        fetchUrl(res.headers.location, redirects - 1).then(resolve).catch(reject);
+        return;
+      }
+      const chunks = [];
+      res.on('data', d => chunks.push(d));
+      res.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+    }).on('error', reject);
+  });
+}
+
+function parseSheetCoords(csv) {
+  const lines = csv.split('\n').filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const result = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseSheetLine(lines[i]);
+    const status = (cols[10] || '').trim();
+    if (status !== 'פעילה') continue;
+    const name = (cols[1] || '').trim();
+    if (!name) continue;
+    result.push({
+      coordKey:  slugifyStr(name),
+      coordName: name,
+      city:      (cols[6] || '').trim().replace(/^"|"$/g, ''),
+    });
+  }
+  return result;
+}
+
+function parseSheetLine(line) {
+  const cols = []; let cur = '', inQ = false;
+  for (const c of line) {
+    if (c === '"') { inQ = !inQ; continue; }
+    if (c === ',' && !inQ) { cols.push(cur); cur = ''; continue; }
+    cur += c;
+  }
+  cols.push(cur);
+  return cols;
+}
+
+function slugifyStr(s) { return (s || '').trim().replace(/\s+/g, '-'); }
+
+function postJSON(url, data) {
+  return new Promise((resolve, reject) => {
+    const buf = Buffer.from(JSON.stringify(data), 'utf-8');
+    const u = new URL(url);
+    const req = https.request({
+      hostname: u.hostname,
+      path: u.pathname,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': buf.length },
+    }, res => {
+      let body = '';
+      res.on('data', d => body += d);
+      res.on('end', () => resolve(JSON.parse(body)));
+    });
+    req.on('error', reject);
+    req.write(buf);
+    req.end();
+  });
+}
+
 function postCSV(csv) {
   return new Promise((resolve, reject) => {
     const buf = Buffer.from(csv, 'utf-8');
-    const req = http.request({
-      hostname: 'localhost',
-      port: SERVER_PORT,
-      path: '/api/update',
+    const url = new URL(CLOUD_URL);
+    const req = https.request({
+      hostname: url.hostname,
+      path: url.pathname,
       method: 'POST',
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
