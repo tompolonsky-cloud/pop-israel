@@ -93,6 +93,25 @@ const K_WALINKS  = "pop_v6_walinks";
 // ══════════════════════════════════════════════
 function slugify(s="") { return s.trim().replace(/\s+/g,"-"); }
 
+function parseDateIL(s) {
+  if (!s) return null;
+  const m = String(s).match(/(\d{1,2})[./](\d{1,2})[./](\d{2,4})/);
+  if (!m) return null;
+  const [, d, mo, y] = m.map(Number);
+  return new Date(y < 100 ? 2000 + y : y, mo - 1, d);
+}
+
+function pilotInfo(launchDate) {
+  const launch = parseDateIL(launchDate);
+  if (!launch || isNaN(launch.getTime())) return { status: 'unknown' };
+  const now = new Date();
+  const days = (now - launch) / (24 * 3600 * 1000);
+  if (days < 0) return { status: 'upcoming', launch };
+  const week = Math.min(4, Math.floor(days / 7) + 1);
+  if (days < 28) return { status: 'pilot', week, launch };
+  return { status: 'regular', launch };
+}
+
 function isUrgent() {
   const now = new Date();
   const day = now.getDay(); // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu
@@ -453,6 +472,7 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
   const orderCount=coord.orders.length;
   const MIN_ORDERS=5;
   const belowMin=orderCount<MIN_ORDERS && isUrgent();
+  const pilot=pilotInfo(coord.launchDate);
   const missing=MIN_ORDERS-orderCount;
 
   useEffect(()=>{
@@ -473,7 +493,11 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
     <Screen>
       <div style={{background:belowMin?"linear-gradient(155deg,#7f1d1d,#b91c1c)":"linear-gradient(155deg,#1a3c2e,#2d6a4f)",color:"#fff",padding:"20px 20px 24px",transition:"background .4s"}}>
         {onBack&&<div onClick={onBack} style={{fontSize:12,opacity:.7,cursor:"pointer",marginBottom:10,display:"flex",alignItems:"center",gap:4}}>← חזרה</div>}
-        <div style={{fontSize:24,fontWeight:900}}>שלום {coord.coordName}! {belowMin?"⚠️":"🌿"}</div>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          <div style={{fontSize:24,fontWeight:900}}>שלום {coord.coordName}! {belowMin?"⚠️":"🌿"}</div>
+          {pilot.status==="pilot"&&<div style={{background:"#ffd166",color:"#1a3c2e",fontSize:11,fontWeight:900,padding:"3px 10px",borderRadius:99}}>פיילוט שבוע {pilot.week}/4</div>}
+          {pilot.status==="regular"&&<div style={{background:"rgba(255,255,255,.2)",color:"#fff",fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:99}}>✅ נקודה קבועה</div>}
+        </div>
         <div style={{fontSize:13,opacity:.7,marginTop:2}}>📍 {coord.city||coord.deliveryStr}</div>
         <div style={{background:"rgba(255,255,255,.12)",borderRadius:12,padding:"12px 14px",marginTop:14,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -537,8 +561,8 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
       </div>
       <Body>
         {tab==="orders"    && <OrdersTab coord={coord} time={time} showToast={showToast}/>}
-        {tab==="messages"  && <MessagesTab coord={coord} time={time} week={week} driver={driver} waGroupLink={waGroupLink} showToast={showToast}/>}
-        {tab==="reminders" && <RemindersTab coord={coord} waGroupLink={waGroupLink} showToast={showToast}/>}
+        {tab==="messages"  && <MessagesTab coord={coord} time={time} week={week} pilot={pilot} driver={driver} waGroupLink={waGroupLink} showToast={showToast}/>}
+        {tab==="reminders" && <RemindersTab coord={coord} pilot={pilot} waGroupLink={waGroupLink} showToast={showToast}/>}
         {tab==="faq"       && <FaqTab/>}
       </Body>
       <Toast msg={toast}/>
@@ -590,11 +614,12 @@ function OrdersTab({coord,time,showToast}) {
   );
 }
 
-function MessagesTab({coord,time,week,driver,waGroupLink,showToast}) {
+function MessagesTab({coord,time,week,pilot,driver,waGroupLink,showToast}) {
   const storeLink=getStoreLink();
+  const weekLabel = pilot?.status==="pilot" ? `פיילוט שבוע ${pilot.week}/4` : `שבוע ${week?.num||1}`;
   const msgs=[
-    {title:"🔔 פתיחת חנות",      sub:"לפרסום בקבוצה",              color:"#1a3c2e", text:buildStoreOpen(coord,time,week?.num||1)},
-    {title:"🌿 הודעה שבועית",    sub:"שיווק + לינק + קריאה לשתף", color:"#2d6a4f", text:buildGroupAnnounce(coord,time,week?.num||1)},
+    {title:"🔔 פתיחת חנות",      sub:"לפרסום בקבוצה",              color:"#1a3c2e", text:buildStoreOpen(coord,time,weekLabel)},
+    {title:"🌿 הודעה שבועית",    sub:"שיווק + לינק + קריאה לשתף", color:"#2d6a4f", text:buildGroupAnnounce(coord,time,weekLabel)},
     {title:"🔗 לינק החנות",      sub:"להעתקה ושיתוף",              color:"#52b788", text:storeLink},
     {title:"💬 שירות לקוחות",   sub:"התכתבות WA בלבד",            color:"#f4a261", text:`שירות לקוחות פופ ישראל 💬\n${fmtPhone(CS_PHONE)}\n\n⚠️ בהתכתבות בוואטסאפ בלבד (לא שיחות)`},
     {title:"📋 רווית — לוגיסטיקה", sub:"נהג / עיכוב / תיאום",    color:"#e67e22", text:`רווית — מתאמת לוגיסטיקה 🚐\n${fmtPhone(RAVIT_PHONE)}\n\nפונים לרווית רק בנושאים:\n• בעיה עם הנהג\n• עיכוב בחלוקה\n• תיאום מיוחד\n\nבעיות הזמנה ותשלום → שירות לקוחות בלבד.`},
@@ -662,7 +687,7 @@ function FaqTab() {
   );
 }
 
-function RemindersTab({coord,waGroupLink,showToast}) {
+function RemindersTab({coord,pilot,waGroupLink,showToast}) {
   const [notifGranted,setNotifGranted]=useState(typeof Notification!=="undefined"?Notification.permission==="granted":false);
   async function requestNotif(){const perm=await Notification.requestPermission();setNotifGranted(perm==="granted");showToast(perm==="granted"?"✅ נוטיפיקציות פעילות!":"⚠️ לא אושר");}
   function testNotif(){if(!notifGranted){showToast("⚠️ אשר קודם");return;}new Notification("🌿 תזכורת פופ ישראל",{body:"החנות פתוחה! הזמן עכשיו ✅"});}
@@ -677,18 +702,27 @@ function RemindersTab({coord,waGroupLink,showToast}) {
         </div>}
       {notifGranted&&<p style={{fontSize:11,color:"#16a34a",marginTop:10,textAlign:"center"}}>✅ נוטיפיקציות פעילות</p>}
     </Card>
-    <Card style={{borderRight:"4px solid #f4a261"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-        <div><p style={{...T.cardTitle,marginBottom:2}}>🌱 הודעת פיילוט</p><p style={{fontSize:11,color:"#6b7280"}}>לפרסום לשכנים וחברים</p></div>
-        <CopyBtnSimple text={pilotMsg} label="📋 העתק"/>
-      </div>
-      <div style={{background:"#fffbf0",border:"1px solid #fde68a",borderRadius:10,padding:"12px",fontSize:12,color:"#374151",whiteSpace:"pre-wrap",lineHeight:1.7,maxHeight:220,overflowY:"auto",direction:"rtl"}}>
-        {pilotMsg}
-      </div>
-      {waGroupLink&&<a href={waGroupLink} target="_blank" style={{display:"block",marginTop:10,background:"#25d366",color:"#fff",padding:"10px",borderRadius:10,textAlign:"center",textDecoration:"none",fontWeight:700,fontSize:13}}>
-        💬 פתח קבוצת וואטסאפ
-      </a>}
-    </Card>
+    {pilot?.status==="pilot" && (
+      <Card style={{borderRight:"4px solid #f4a261"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+          <div><p style={{...T.cardTitle,marginBottom:2}}>🌱 הודעת פיילוט — שבוע {pilot.week}/4</p><p style={{fontSize:11,color:"#6b7280"}}>לפרסום לשכנים וחברים</p></div>
+          <CopyBtnSimple text={pilotMsg} label="📋 העתק"/>
+        </div>
+        <div style={{background:"#fffbf0",border:"1px solid #fde68a",borderRadius:10,padding:"12px",fontSize:12,color:"#374151",whiteSpace:"pre-wrap",lineHeight:1.7,maxHeight:220,overflowY:"auto",direction:"rtl"}}>
+          {pilotMsg}
+        </div>
+        {waGroupLink&&<a href={waGroupLink} target="_blank" style={{display:"block",marginTop:10,background:"#25d366",color:"#fff",padding:"10px",borderRadius:10,textAlign:"center",textDecoration:"none",fontWeight:700,fontSize:13}}>
+          💬 פתח קבוצת וואטסאפ
+        </a>}
+      </Card>
+    )}
+    {pilot?.status==="regular" && (
+      <Card style={{borderRight:"4px solid #16a34a",textAlign:"center",padding:"24px 16px"}}>
+        <div style={{fontSize:36,marginBottom:8}}>🎉</div>
+        <div style={{fontSize:16,fontWeight:900,color:"#1a3c2e",marginBottom:6}}>סיימת את הפיילוט!</div>
+        <div style={{fontSize:13,color:"#6b7280",lineHeight:1.6}}>הנקודה שלך הפכה לנקודת חלוקה קבועה של פופ ישראל 🌿</div>
+      </Card>
+    )}
   </>;
 }
 

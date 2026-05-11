@@ -111,17 +111,23 @@ function fetchUrl(url, redirects = 5) {
 function parseSheetCoords(csv) {
   const lines = csv.split('\n').filter(l => l.trim());
   if (lines.length < 2) return [];
+  const hdr = parseSheetLine(lines[0]).map(h => h.trim());
+  const iName   = hdr.findIndex(h => h.includes('שם הרכז'));
+  const iCity   = hdr.findIndex(h => h.includes('עיר'));
+  const iStatus = hdr.findIndex(h => h.includes('סטטוס'));
+  const iLaunch = hdr.findIndex(h => h.includes('העלאה'));
+  if (iName < 0 || iStatus < 0) return [];
   const result = [];
   for (let i = 1; i < lines.length; i++) {
     const cols = parseSheetLine(lines[i]);
-    const status = (cols[10] || '').trim();
-    if (status !== 'פעילה') continue;
-    const name = (cols[1] || '').trim();
+    if ((cols[iStatus] || '').trim() !== 'פעילה') continue;
+    const name = (cols[iName] || '').trim();
     if (!name) continue;
     result.push({
-      coordKey:  slugifyStr(name),
-      coordName: name,
-      city:      (cols[6] || '').trim().replace(/^"|"$/g, ''),
+      coordKey:   slugifyStr(name),
+      coordName:  name,
+      city:       iCity  >= 0 ? (cols[iCity]   || '').trim().replace(/^"|"$/g, '') : '',
+      launchDate: iLaunch >= 0 ? (cols[iLaunch] || '').trim() : '',
     });
   }
   return result;
