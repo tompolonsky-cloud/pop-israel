@@ -600,18 +600,6 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
             }}>💾 שמור חברי קבוצות</button>
           </Card>
 
-          <Card>
-            <p style={{...T.cardTitle,marginBottom:14}}>⏰ שעות חלוקה</p>
-            {filteredCoords.map(c=>(
-              <div key={c.coordKey} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #e8ede9"}}>
-                <div style={{flex:1,fontSize:13,fontWeight:600}}><CoordName name={c.coordName}/> <span style={{color:"#6b7280",fontWeight:400}}>— {c.city}</span></div>
-                <input type="time" value={localTimes[c.coordKey]||"17:00"}
-                  onChange={e=>setLocalTimes({...localTimes,[c.coordKey]:e.target.value})}
-                  style={{border:"1.5px solid #d1fae5",borderRadius:8,padding:"5px 8px",fontSize:13,fontFamily:"Heebo,sans-serif",color:"#1a3c2e"}}/>
-              </div>
-            ))}
-            <button style={{...S.btn,marginTop:14}} onClick={()=>onSaveTimes(localTimes)}>💾 שמור שעות</button>
-          </Card>
         </>}
 
         {adTab==="drivers" && <>
