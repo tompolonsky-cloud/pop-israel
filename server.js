@@ -60,14 +60,19 @@ app.post('/api/settings', (req, res) => {
 
 // רכזים שהוסרו ידנית — לא יחזרו גם אם הגיליון מכיל אותם
 const COORD_BLOCKLIST = new Set([
-  'אפרת', 'מיכל-ברעם', 'אורלי-לוי', 'אסנת-אלוס',
+  'אפרת', 'מיכל-ברעם', 'אורלי-לוי', 'אסנת-אלוס', 'אוסנת',
 ]);
+
+// רכזים ידניים שמוחלפים/נוספים ללא תלות בגיליון
+const COORD_MANUAL = [
+  { coordKey: 'אוסנת', coordName: 'אוסנת', city: 'בטעון' },
+];
 
 // ── POST /api/coordinators — refresh.js posts active coordinator list here
 app.post('/api/coordinators', (req, res) => {
   const raw = Array.isArray(req.body) ? req.body : null;
   if (!raw) return res.status(400).json({ error: 'invalid' });
-  const list = raw.filter(c => !COORD_BLOCKLIST.has(c.coordKey));
+  const list = [...raw.filter(c => !COORD_BLOCKLIST.has(c.coordKey)), ...COORD_MANUAL];
   coordList = list;
   fs.writeFileSync(COORD_FILE, JSON.stringify(list, null, 2));
   console.log(`📋 רכזים עודכנו — ${list.length} פעילות`);
