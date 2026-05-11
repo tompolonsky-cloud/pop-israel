@@ -423,6 +423,11 @@ function App() {
   return null;
 }
 
+function weekOfMonth() {
+  const d = new Date().getDate();
+  return ['','ראשון','שני','שלישי','רביעי','חמישי'][Math.ceil(d/7)] || Math.ceil(d/7);
+}
+
 // ══════════════════════════════════════════════
 // ADMIN SCREEN
 // ══════════════════════════════════════════════
@@ -445,7 +450,7 @@ const STATUS_BG     = { red:'#fef2f2', yellow:'#fffbeb', green:'#f0fdf4' };
 const STATUS_BORDER = { red:'#fca5a5', yellow:'#fcd34d', green:'#86efac' };
 
 function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedAt,memberData,onSaveTimes,onSaveDrivers,onSaveWaLinks,onFireNotif,onSaveMemberData,onCoordLink,onCoordWA,onOpenCoord,onUpdateMembers,toast,showToast}) {
-  const [adTab,setAdTab]=useState("overview");
+  const [adTab,setAdTab]=useState("checklist");
   const [search,setSearch]=useState("");
   const [localTimes,setLocalTimes]=useState({...times});
   const [localDrivers,setLocalDrivers]=useState({...drivers});
@@ -474,12 +479,12 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
 
   return (
     <Screen>
-      <GreenHeader title={week.label} sub={`${coords.length} רכזים · ${totalOrders} הזמנות`}>
+      <GreenHeader title={`שבוע ${weekOfMonth()} בחודש`} sub={`${coords.length} רכזים · ${totalOrders} הזמנות`}>
         {updatedStr&&<div style={{fontSize:10,opacity:.6,marginTop:4}}>עדכון אחרון: {updatedStr}</div>}
       </GreenHeader>
 
       <div style={{background:"#1a3c2e",display:"flex",borderBottom:"2px solid #2d6a4f",overflowX:"auto"}}>
-        {[["overview","📊"],["coords","👥"],["drivers","🚐"],["walinks","💬"],["progress","📈"]].map(([k,l])=>(
+        {[["checklist","✅"],["overview","📊"],["coords","🔗"],["members","👥"],["drivers","🚐"],["walinks","💬"],["progress","📈"]].map(([k,l])=>(
           <div key={k} onClick={()=>setAdTab(k)} style={{flex:"0 0 auto",padding:"10px 14px",textAlign:"center",fontSize:18,color:adTab===k?"#ffd166":"rgba(255,255,255,.45)",borderBottom:adTab===k?"2px solid #ffd166":"2px solid transparent",cursor:"pointer",marginBottom:-2}}>
             {l}
           </div>
@@ -487,6 +492,8 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
       </div>
 
       <Body>
+        {adTab==="checklist" && <ChecklistTab staleCoords={staleCoords} showToast={showToast}/>}
+
         {adTab==="overview" && <>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
             {[[coords.length,"רכזים","🌿"],[totalOrders,"הזמנות","📋"],["₪"+totalRev.toLocaleString("he-IL"),"סה\"כ","💰"]].map(([v,l,ic])=>(
@@ -526,19 +533,6 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
             })}
           </Card>
 
-{staleCoords.length>0&&(
-            <Card style={{borderRight:"4px solid #f59e0b"}}>
-              <p style={{...T.cardTitle,marginBottom:10,color:"#b45309"}}>⚠️ טרם עודכן — חברי קבוצה</p>
-              <p style={{fontSize:11,color:"#78350f",marginBottom:10}}>הרכזים הבאים לא עודכנו השבוע. עדכני ב-👥 טאב "רכזים":</p>
-              {staleCoords.map(c=>(
-                <div key={c.coordKey} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"1px solid #fef3c7"}}>
-                  <span style={{fontSize:13}}>🔶</span>
-                  <div style={{flex:1,fontSize:13,fontWeight:600}}><CoordName name={c.coordName}/></div>
-                  <div style={{fontSize:11,color:"#9ca3af"}}>{c.city}</div>
-                </div>
-              ))}
-            </Card>
-          )}
         </>}
 
         {adTab==="coords" && <>
@@ -562,17 +556,20 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
               </div>
             ))}
           </Card>
+        </>}
+
+        {adTab==="members" && <>
           <Card>
-            <p style={{...T.cardTitle,marginBottom:14}}>👥 חברי קבוצות</p>
-            <p style={{fontSize:11,color:"#6b7280",marginBottom:12}}>עדכני פעם בשבוע — מספר חברים ומתי הצטרף האחרון</p>
-            {filteredCoords.map(c=>{
+            <p style={{...T.cardTitle,marginBottom:6}}>👥 חברי קבוצות</p>
+            <p style={{fontSize:11,color:"#6b7280",marginBottom:14}}>עדכני פעם בשבוע — מספר חברים בקבוצת וואטסאפ ותאריך הצטרפות אחרון</p>
+            {coords.map(c=>{
               const e=localMembers[c.coordKey]||{};
               return (
                 <div key={c.coordKey} style={{padding:"10px 0",borderBottom:"1px solid #e8ede9"}}>
                   <div style={{fontSize:13,fontWeight:700,marginBottom:7}}><CoordName name={c.coordName}/> <span style={{color:"#6b7280",fontWeight:400,fontSize:11}}>— {c.city}</span></div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <input type="number" min={0} placeholder="מס׳ חברים" value={e.count||""}
-                      onChange={ev=>setLocalMembers(prev=>({...prev,[c.coordKey]:{...( prev[c.coordKey]||{}),count:parseInt(ev.target.value)||0}}))}
+                      onChange={ev=>setLocalMembers(prev=>({...prev,[c.coordKey]:{...(prev[c.coordKey]||{}),count:parseInt(ev.target.value)||0}}))}
                       style={S.input}/>
                     <input type="date" value={e.lastJoined||""}
                       onChange={ev=>setLocalMembers(prev=>({...prev,[c.coordKey]:{...(prev[c.coordKey]||{}),lastJoined:ev.target.value}}))}
@@ -586,9 +583,8 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
               const withTs=Object.fromEntries(Object.entries(localMembers).map(([k,v])=>[k,{...v,lastUpdated:ts}]));
               setLocalMembers(withTs);
               onSaveMemberData(withTs);
-            }}>💾 שמור חברי קבוצות</button>
+            }}>💾 שמור</button>
           </Card>
-
         </>}
 
         {adTab==="drivers" && <>
@@ -659,6 +655,78 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
 }
 
 // ══════════════════════════════════════════════
+// ══════════════════════════════════════════════
+// CHECKLIST TAB
+// ══════════════════════════════════════════════
+function CheckItem({text,done,onToggle}){
+  return (
+    <div onClick={onToggle} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"11px 0",borderBottom:"1px solid #e8ede9",cursor:"pointer"}}>
+      <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${done?"#2d6a4f":"#d1d5db"}`,background:done?"#2d6a4f":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1,transition:"all .2s"}}>
+        {done&&<span style={{color:"#fff",fontSize:13,fontWeight:900}}>✓</span>}
+      </div>
+      <div style={{fontSize:13,color:done?"#9ca3af":"#1a3c2e",textDecoration:done?"line-through":"none",lineHeight:1.5}}>{text}</div>
+    </div>
+  );
+}
+
+function ChecklistTab({staleCoords}){
+  const todayKey = new Date().toDateString();
+  const [checked,setChecked]=useState(()=>sto_get("pop_checklist_"+todayKey)||{});
+  function toggle(id){const n={...checked,[id]:!checked[id]};setChecked(n);sto_set("pop_checklist_"+todayKey,n);}
+
+  const day=new Date().getDay();
+  const DAY_NAMES=["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
+  const DAILY={
+    0:[
+      {id:"s1",text:"📢 שלח הודעת פתיחת חנות לכל הרכזים — החנות נפתחת ב-19:00"},
+      {id:"s2",text:"🆕 שלח ברוך הבא למזמינים חדשים משבוע שעבר"},
+    ],
+    1:[{id:"m1",text:"🧺 הזמן סל רכזים לשבוע הבא (לפני 14:00!)"}],
+    2:[{id:"t1",text:"📊 בדוק סטטוס הזמנות — מי ב🔴 ומי צריך עזרה?"}],
+    3:[{id:"w1",text:"🔔 שלח תזכורת לרכזים — מחר יום אחרון להזמנות!"}],
+    4:[
+      {id:"h1",text:"⏰ שלח תזכורת אחרונה לפני סגירת ההזמנות ב-8:00"},
+      {id:"h2",text:"🚐 תאם עם נהגים שעות ומסלולי חלוקה"},
+    ],
+    5:[
+      {id:"f1",text:"📋 שלח רשימות מזמינים לכל רכז"},
+      {id:"f2",text:"📦 וודא שהחלוקה מתואמת לכולם"},
+    ],
+    6:[],
+  };
+  const weekly=[
+    {id:"w_mem",text:"👥 עדכן חברי קבוצות — מספר חברים + תאריך הצטרפות אחרון (טאב 👥)"},
+    {id:"w_stat",text:"📊 בדוק סטטוס רכזים — מי ב🔴 ומי צריך עזרה"},
+  ];
+  const todayTasks=DAILY[day]||[];
+
+  return <>
+    <Card>
+      <p style={{...T.cardTitle,marginBottom:12}}>📅 היום — {DAY_NAMES[day]}</p>
+      {todayTasks.length===0
+        ?<p style={{fontSize:13,color:"#6b7280",padding:"8px 0"}}>אין משימות ייחודיות להיום ✓</p>
+        :todayTasks.map(t=><CheckItem key={t.id} text={t.text} done={!!checked[t.id]} onToggle={()=>toggle(t.id)}/>)
+      }
+    </Card>
+    <Card>
+      <p style={{...T.cardTitle,marginBottom:12}}>🔁 שבועי</p>
+      {weekly.map(t=><CheckItem key={t.id} text={t.text} done={!!checked[t.id]} onToggle={()=>toggle(t.id)}/>)}
+    </Card>
+    {staleCoords.length>0&&(
+      <Card style={{borderRight:"4px solid #f59e0b"}}>
+        <p style={{...T.cardTitle,marginBottom:10,color:"#b45309"}}>⚠️ לא עודכן — חברי קבוצה</p>
+        {staleCoords.map(c=>(
+          <div key={c.coordKey} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"1px solid #fef3c7"}}>
+            <span>🔶</span>
+            <div style={{flex:1,fontSize:13,fontWeight:600}}><CoordName name={c.coordName}/></div>
+            <div style={{fontSize:11,color:"#9ca3af"}}>{c.city}</div>
+          </div>
+        ))}
+      </Card>
+    )}
+  </>;
+}
+
 // COORDINATOR SCREEN — same as v5
 // ══════════════════════════════════════════════
 function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast,showToast,updatedAt,history,memberEntry}) {
@@ -699,28 +767,17 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
           {pilot.status==="regular"&&<div style={{background:"rgba(255,255,255,.2)",color:"#fff",fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:99}}>✅ נקודה קבועה</div>}
         </div>
         <div style={{fontSize:13,opacity:.7,marginTop:2}}>📍 {coord.city||coord.deliveryStr}</div>
-        {pilot.status==="pilot"&&(
+        {(pilot.status==="pilot"||history?.length>0)&&(
           <div style={{marginTop:14}}>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:6}}>
-              <span>📅 פיילוט</span><span>שבוע {pilot.week} מתוך 4</span>
+              <span>📅 {pilot.status==="pilot"?"פיילוט":"שבועות פעילות"}</span>
+              <span>{pilot.status==="pilot"?`שבוע ${pilot.week} מתוך 4`:`שבוע ${history.length}`}</span>
             </div>
             <div style={{display:"flex",gap:5}}>
-              {[1,2,3,4].map(w=>(
-                <div key={w} style={{flex:1,height:8,borderRadius:99,
-                  background:w<pilot.week?"#86efac":w===pilot.week?"#ffd166":"rgba(255,255,255,.2)",
-                  transition:"background .3s"}}/>
-              ))}
-            </div>
-          </div>
-        )}
-        {pilot.status==="regular"&&pilot.launch&&(
-          <div style={{marginTop:14}}>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:6}}>
-              <span>✅ נקודה קבועה</span>
-              <span>שבוע {Math.floor((Date.now()-pilot.launch.getTime())/(7*24*3600*1000))+1} מהפיילוט</span>
-            </div>
-            <div style={{background:"rgba(255,255,255,.2)",borderRadius:99,height:8}}>
-              <div style={{width:"100%",height:"100%",background:"#86efac",borderRadius:99}}/>
+              {pilot.status==="pilot"
+                ?[1,2,3,4].map(w=><div key={w} style={{flex:1,height:8,borderRadius:99,background:w<pilot.week?"#86efac":w===pilot.week?"#ffd166":"rgba(255,255,255,.2)",transition:"background .3s"}}/>)
+                :Array.from({length:Math.min(history.length,8)}).map((_,i)=><div key={i} style={{flex:1,height:8,borderRadius:99,background:"#86efac"}}/>)
+              }
             </div>
           </div>
         )}
@@ -728,17 +785,15 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
           {updatedAt&&<span>עודכן {new Date(updatedAt).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})} · </span>}
           <span>מתעדכן בכל יום ב-08:00, 13:00, 19:00</span>
         </div>
-        {memberEntry?.count>0&&(
-          <div style={{marginTop:12}}>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:4}}>
-              <span>👥 חברי קבוצת וואטסאפ{memberEntry.lastJoined?` · הצטרף אחרון: ${memberEntry.lastJoined}`:""}</span>
-              <span>{memberEntry.count} / {GROUP_TARGET}</span>
-            </div>
-            <div style={{background:"rgba(255,255,255,.2)",borderRadius:99,height:8}}>
-              <div style={{width:Math.min(100,(memberEntry.count/GROUP_TARGET)*100)+"%",height:"100%",background:"#ffd166",borderRadius:99,transition:"width .5s"}}/>
-            </div>
+        <div style={{marginTop:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:4}}>
+            <span>👥 חברי קבוצת וואטסאפ{memberEntry?.lastJoined?` · הצטרף אחרון: ${memberEntry.lastJoined}`:""}</span>
+            <span>{memberEntry?.count||0} / {GROUP_TARGET}</span>
           </div>
-        )}
+          <div style={{background:"rgba(255,255,255,.2)",borderRadius:99,height:8}}>
+            <div style={{width:Math.min(100,((memberEntry?.count||0)/GROUP_TARGET)*100)+"%",height:"100%",background:"#ffd166",borderRadius:99,transition:"width .5s"}}/>
+          </div>
+        </div>
         <div style={{marginTop:12}}>
           {isRegular ? (<>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:4}}>
