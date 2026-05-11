@@ -699,29 +699,31 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
           {pilot.status==="regular"&&<div style={{background:"rgba(255,255,255,.2)",color:"#fff",fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:99}}>✅ נקודה קבועה</div>}
         </div>
         <div style={{fontSize:13,opacity:.7,marginTop:2}}>📍 {coord.city||coord.deliveryStr}</div>
-        <div style={{background:"rgba(255,255,255,.12)",borderRadius:12,padding:"12px 14px",marginTop:14,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <span style={{fontSize:26}}>🕐</span>
-            <div><div style={{fontSize:10,opacity:.7}}>חלוקה היום</div><div style={{fontSize:22,fontWeight:900,color:"#ffd166"}}>{time}</div></div>
+        {pilot.status==="pilot"&&(
+          <div style={{marginTop:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:6}}>
+              <span>📅 פיילוט</span><span>שבוע {pilot.week} מתוך 4</span>
+            </div>
+            <div style={{display:"flex",gap:5}}>
+              {[1,2,3,4].map(w=>(
+                <div key={w} style={{flex:1,height:8,borderRadius:99,
+                  background:w<pilot.week?"#86efac":w===pilot.week?"#ffd166":"rgba(255,255,255,.2)",
+                  transition:"background .3s"}}/>
+              ))}
+            </div>
           </div>
-          {driver?.phone&&(
-            <a href={`tel:${driver.phone}`} style={{background:"rgba(255,255,255,.15)",borderRadius:10,padding:"8px 12px",color:"#fff",textDecoration:"none",textAlign:"center"}}>
-              <div style={{fontSize:18}}>🚐</div>
-              <div style={{fontSize:10,opacity:.8}}>{driver.name||"נהג"}</div>
-              <div style={{fontSize:11,fontWeight:700,color:"#ffd166"}}>{fmtPhone(driver.phone)}</div>
-            </a>
-          )}
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:12}}>
-          <div style={{background:belowMin?"rgba(239,68,68,.35)":"rgba(255,255,255,.11)",borderRadius:10,padding:"10px",textAlign:"center",border:belowMin?"2px solid rgba(252,165,165,.6)":"2px solid transparent"}}>
-            <div style={{fontSize:20,fontWeight:900,color:belowMin?"#fca5a5":"#ffd166"}}>{orderCount}</div>
-            <div style={{fontSize:10,opacity:.8}}>מזמינים {belowMin?`(חסרים ${missing})`:""}</div>
+        )}
+        {pilot.status==="regular"&&pilot.launch&&(
+          <div style={{marginTop:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:6}}>
+              <span>✅ נקודה קבועה</span>
+              <span>שבוע {Math.floor((Date.now()-pilot.launch.getTime())/(7*24*3600*1000))+1} מהפיילוט</span>
+            </div>
+            <div style={{background:"rgba(255,255,255,.2)",borderRadius:99,height:8}}>
+              <div style={{width:"100%",height:"100%",background:"#86efac",borderRadius:99}}/>
+            </div>
           </div>
-          <div style={{background:"rgba(255,255,255,.11)",borderRadius:10,padding:"10px",textAlign:"center"}}>
-            <div style={{fontSize:20,fontWeight:900,color:"#ffd166"}}>{"₪"+totalRev.toLocaleString("he-IL")}</div>
-            <div style={{fontSize:10,opacity:.7}}>לגבייה</div>
-          </div>
-        </div>
+        )}
         <div style={{marginTop:10,fontSize:10,opacity:.5,textAlign:"center"}}>
           {updatedAt&&<span>עודכן {new Date(updatedAt).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})} · </span>}
           <span>מתעדכן בכל יום ב-08:00, 13:00, 19:00</span>
