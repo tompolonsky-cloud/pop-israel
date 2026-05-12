@@ -17,6 +17,11 @@
   body { font-family: 'Heebo', sans-serif; background: #fefcf7; }
   @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;900&display=swap');
   @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { from { opacity:.8; } to { opacity:1; transform: scale(1.06); } }
+  @keyframes confettiFall {
+    0%   { transform: translateY(0) rotate(0deg);   opacity: 1; }
+    100% { transform: translateY(420px) rotate(740deg); opacity: 0; }
+  }
 </style>
 </head>
 <body>
@@ -712,6 +717,34 @@ function ChecklistTab({staleCoords}){
   </>;
 }
 
+// ══════════════════════════════════════════════
+// CONFETTI
+// ══════════════════════════════════════════════
+function Confetti() {
+  const COLORS = ['#ffd166','#86efac','#60a5fa','#f472b6','#fb923c','#a78bfa','#34d399','#fbbf24'];
+  const pieces = Array.from({length: 28}, (_, i) => ({
+    id: i,
+    color: COLORS[i % COLORS.length],
+    left: `${((i * 3.7 + Math.sin(i) * 9 + 3) % 96) + 2}%`,
+    delay: `${((i * 0.11) % 1.6).toFixed(2)}s`,
+    duration: `${(1.6 + (i % 6) * 0.25).toFixed(2)}s`,
+    size: 6 + (i % 5) * 2,
+    radius: i % 3 === 0 ? '50%' : i % 3 === 1 ? '2px' : '0%',
+  }));
+  return (
+    <div style={{position:'absolute',top:0,left:0,right:0,bottom:0,overflow:'hidden',pointerEvents:'none',zIndex:5}}>
+      {pieces.map(p => (
+        <div key={p.id} style={{
+          position:'absolute', left:p.left, top:'-12px',
+          width:p.size, height:p.size,
+          background:p.color, borderRadius:p.radius,
+          animation:`confettiFall ${p.duration} ${p.delay} ease-in forwards`,
+        }}/>
+      ))}
+    </div>
+  );
+}
+
 // COORDINATOR SCREEN — same as v5
 // ══════════════════════════════════════════════
 function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast,showToast,updatedAt,history,memberEntry}) {
@@ -725,6 +758,8 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
   const belowMin=isUrgent()&&(isRegular ? totalRev<MIN_REV : orderCount<MIN_ORDERS);
   const activeReminders=getActiveReminders(pilot);
   const missing=MIN_ORDERS-orderCount;
+  const daysSinceLaunch = pilot.launch ? Math.floor((Date.now()-pilot.launch.getTime())/(24*3600*1000)) : 999;
+  const justGraduated = isRegular && daysSinceLaunch < 35;
 
   useEffect(()=>{
     if(belowMin&&typeof Notification!=="undefined"&&Notification.permission==="granted"){
@@ -749,7 +784,8 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
           <div style={{fontSize:24,fontWeight:900}}>שלום {coord.coordName}! {belowMin?"⚠️":"🌿"}</div>
           {pilot.status==="pilot"&&<div style={{background:"#ffd166",color:"#1a3c2e",fontSize:11,fontWeight:900,padding:"3px 10px",borderRadius:99}}>פיילוט שבוע {pilot.week}/4</div>}
-          {pilot.status==="regular"&&<div style={{background:"rgba(255,255,255,.2)",color:"#fff",fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:99}}>✅ נקודה קבועה</div>}
+          {isRegular&&!justGraduated&&<div style={{background:"rgba(255,255,255,.2)",color:"#fff",fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:99}}>✅ נקודה קבועה</div>}
+          {justGraduated&&<div style={{background:"#ffd166",color:"#1a3c2e",fontSize:11,fontWeight:900,padding:"3px 10px",borderRadius:99,animation:"pulse 1s ease-in-out infinite alternate"}}>🎉 סיימת פיילוט!</div>}
         </div>
         <div style={{fontSize:13,opacity:.7,marginTop:2}}>📍 {coord.city||coord.deliveryStr}</div>
         {(()=>{
@@ -774,6 +810,15 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
             </div>
           );
         })()}
+        {justGraduated&&(
+          <div style={{position:'relative',overflow:'hidden',marginTop:16,background:'rgba(255,209,102,.18)',border:'1.5px solid #ffd166',borderRadius:14,padding:'16px 16px 14px'}}>
+            <Confetti/>
+            <div style={{position:'relative',zIndex:6}}>
+              <div style={{fontSize:22,fontWeight:900,marginBottom:4}}>🎉 כל הכבוד!</div>
+              <div style={{fontSize:13,lineHeight:1.6,opacity:.95}}>השלמת 4 שבועות של פיילוט — אתם עכשיו <strong>נקודת חלוקה קבועה</strong> של פופ ישראל 🌿</div>
+            </div>
+          </div>
+        )}
         <div style={{marginTop:10,fontSize:10,opacity:.5,textAlign:"center"}}>
           {updatedAt&&<span>עודכן {new Date(updatedAt).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})} · </span>}
           <span>מתעדכן בכל יום ב-08:00, 13:00, 19:00</span>
@@ -833,7 +878,7 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
       </div>
       <Body>
         {tab==="orders"    && <OrdersTab coord={coord} time={time} showToast={showToast}/>}
-        {tab==="messages"  && <MessagesTab coord={coord} time={time} week={week} pilot={pilot} driver={driver} waGroupLink={waGroupLink} showToast={showToast}/>}
+        {tab==="messages"  && <MessagesTab coord={coord} time={time} week={week} pilot={pilot} driver={driver} waGroupLink={waGroupLink} justGraduated={justGraduated} showToast={showToast}/>}
         {tab==="reminders" && <RemindersTab coord={coord} pilot={pilot} activeReminders={activeReminders} waGroupLink={waGroupLink} history={history} showToast={showToast}/>}
         {tab==="faq"       && <FaqTab/>}
       </Body>
@@ -889,7 +934,7 @@ function OrdersTab({coord,time,showToast}) {
   );
 }
 
-function MessagesTab({coord,time,week,pilot,driver,waGroupLink,showToast}) {
+function MessagesTab({coord,time,week,pilot,driver,waGroupLink,justGraduated,showToast}) {
   const storeLink=getStoreLink();
   const weekLabel = pilot?.status==="pilot" ? `פיילוט שבוע ${pilot.week}/4` : `שבוע ${week?.num||1}`;
   const msgs=[
@@ -900,7 +945,10 @@ function MessagesTab({coord,time,week,pilot,driver,waGroupLink,showToast}) {
     {title:"📋 רווית — לוגיסטיקה", sub:"נהג / עיכוב / תיאום",    color:"#e67e22", text:`רווית — מתאמת לוגיסטיקה 🚐\n${fmtPhone(RAVIT_PHONE)}\n\nפונים לרווית רק בנושאים:\n• בעיה עם הנהג\n• עיכוב בחלוקה\n• תיאום מיוחד\n\nבעיות הזמנה ותשלום → שירות לקוחות בלבד.`},
   ];
   if(driver?.phone) msgs.push({title:`🚐 ${driver.name||"הנהג שלך"}`,sub:fmtPhone(driver.phone),color:"#6b7280",text:`הנהג שלך: ${driver.name||""}\n${fmtPhone(driver.phone)} 📞`});
+  const graduationMsg = `🎉 *כל הכבוד — השלמנו את הפיילוט!*\n\nחברים, 4 שבועות עברנו ביחד והפכנו לנקודת חלוקה קבועה של פופ ישראל 🌿\n\nתודה לכל אחד ואחת שהזמין, שיתף, ותמך — יחד עשינו את זה! 💚\n\nמעכשיו אנחנו ממשיכים לצמוח יחד, שבוע אחרי שבוע.\n\nמי שעוד לא הזמין — החנות פתוחה כרגיל 👇\n${getStoreLink()}`;
+
   return <>
+    {justGraduated&&<CopyCard title="🎉 סיימנו פיילוט!" sub="שלח לקבוצה — הישג משותף" color="#f59e0b" text={graduationMsg} showToast={showToast}/>}
     {msgs.slice(0,3).map((m,i)=><CopyCard key={i} {...m} showToast={showToast}/>)}
     <div style={{background:"#fffbeb",border:"1.5px solid #fcd34d",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
       <p style={{fontSize:12,fontWeight:800,color:"#92400e",marginBottom:6}}>📞 למי פונים?</p>
