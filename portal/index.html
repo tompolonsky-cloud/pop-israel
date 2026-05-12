@@ -720,8 +720,8 @@ function ChecklistTab({staleCoords}){
 // ══════════════════════════════════════════════
 // CONFETTI
 // ══════════════════════════════════════════════
-function Confetti() {
-  const COLORS = ['#ffd166','#86efac','#60a5fa','#f472b6','#fb923c','#a78bfa','#34d399','#fbbf24'];
+function Confetti({colors}) {
+  const COLORS = colors || ['#ffd166','#86efac','#60a5fa','#f472b6','#fb923c','#a78bfa','#34d399','#fbbf24'];
   const pieces = Array.from({length: 28}, (_, i) => ({
     id: i,
     color: COLORS[i % COLORS.length],
@@ -760,6 +760,12 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
   const missing=MIN_ORDERS-orderCount;
   const daysSinceLaunch = pilot.launch ? Math.floor((Date.now()-pilot.launch.getTime())/(24*3600*1000)) : 999;
   const justGraduated = isRegular && daysSinceLaunch < 35;
+  const prevWeeks = (history||[]).filter(h=>h.week!==week?.num).sort((a,b)=>a.week-b.week);
+  const lastWeek = prevWeeks.length ? prevWeeks[prevWeeks.length-1] : null;
+  const beatOrders = lastWeek && orderCount > lastWeek.orders;
+  const beatRevenue = lastWeek && totalRev > lastWeek.revenue;
+  const beatLastWeek = beatOrders || beatRevenue;
+  const hitMemberTarget = (memberEntry?.count||0) >= GROUP_TARGET;
 
   useEffect(()=>{
     if(belowMin&&typeof Notification!=="undefined"&&Notification.permission==="granted"){
@@ -819,6 +825,28 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
             </div>
           </div>
         )}
+        {hitMemberTarget&&(
+          <div style={{position:'relative',overflow:'hidden',marginTop:10,background:'rgba(167,139,250,.2)',border:'1.5px solid #a78bfa',borderRadius:14,padding:'14px 16px 12px'}}>
+            <Confetti colors={['#ffd700','#f59e0b','#fbbf24','#fde68a','#fef3c7','#a78bfa','#c4b5fd']}/>
+            <div style={{position:'relative',zIndex:6}}>
+              <div style={{fontSize:20,fontWeight:900,marginBottom:3}}>🏆 הגעת ל-60 חברים!</div>
+              <div style={{fontSize:13,lineHeight:1.6,opacity:.95}}>קבוצת וואטסאפ מלאה — {memberEntry?.count} חברים פעילים. עבודה מדהימה! ⭐</div>
+            </div>
+          </div>
+        )}
+        {beatLastWeek&&!justGraduated&&(
+          <div style={{position:'relative',overflow:'hidden',marginTop:10,background:'rgba(134,239,172,.18)',border:'1.5px solid #86efac',borderRadius:14,padding:'14px 16px 12px'}}>
+            <Confetti colors={['#86efac','#34d399','#6ee7b7','#4ade80','#a7f3d0','#ffd166','#fbbf24']}/>
+            <div style={{position:'relative',zIndex:6}}>
+              <div style={{fontSize:20,fontWeight:900,marginBottom:3}}>📈 שברת את השיא!</div>
+              <div style={{fontSize:13,lineHeight:1.6,opacity:.95}}>
+                {beatOrders&&beatRevenue ? `${orderCount} הזמנות ו-₪${totalRev.toLocaleString('he-IL')} — יותר מכל שבוע עד עכשיו 🔥`
+                  : beatOrders ? `${orderCount} הזמנות — יותר מהשבוע שעבר (${lastWeek.orders}) 🔥`
+                  : `₪${totalRev.toLocaleString('he-IL')} — יותר מהשבוע שעבר (₪${lastWeek.revenue.toLocaleString('he-IL')}) 🔥`}
+              </div>
+            </div>
+          </div>
+        )}
         <div style={{marginTop:10,fontSize:10,opacity:.5,textAlign:"center"}}>
           {updatedAt&&<span>עודכן {new Date(updatedAt).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})} · </span>}
           <span>מתעדכן בכל יום ב-08:00, 13:00, 19:00</span>
@@ -835,18 +863,22 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
         <div style={{marginTop:12}}>
           {isRegular ? (<>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:4}}>
-              <span>הכנסות שבועיות</span><span>₪{totalRev.toLocaleString('he-IL')} / ₪{MIN_REV} מינימום</span>
+              <span>הכנסות שבועיות{beatRevenue&&<span style={{color:"#ffd166",fontWeight:900}}> 🔥 שיא!</span>}</span>
+              <span>₪{totalRev.toLocaleString('he-IL')} / ₪{MIN_REV} מינימום</span>
             </div>
             <div style={{background:"rgba(255,255,255,.2)",borderRadius:99,height:8}}>
               <div style={{width:Math.min(100,(totalRev/MIN_REV)*100)+"%",height:"100%",background:belowMin?"#fca5a5":"#86efac",borderRadius:99,transition:"width .5s"}}/>
             </div>
+            {lastWeek&&<div style={{fontSize:10,opacity:.55,marginTop:3}}>שבוע שעבר: ₪{lastWeek.revenue.toLocaleString('he-IL')} · {lastWeek.orders} הזמנות</div>}
           </>) : (<>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:4}}>
-              <span>התקדמות לחלוקה</span><span>{orderCount} / {MIN_ORDERS} מינימום</span>
+              <span>התקדמות לחלוקה{beatOrders&&<span style={{color:"#ffd166",fontWeight:900}}> 🔥 שיא!</span>}</span>
+              <span>{orderCount} / {MIN_ORDERS} מינימום</span>
             </div>
             <div style={{background:"rgba(255,255,255,.2)",borderRadius:99,height:8}}>
               <div style={{width:Math.min(100,(orderCount/MIN_ORDERS)*100)+"%",height:"100%",background:belowMin?"#fca5a5":"#86efac",borderRadius:99,transition:"width .5s"}}/>
             </div>
+            {lastWeek&&<div style={{fontSize:10,opacity:.55,marginTop:3}}>שבוע שעבר: {lastWeek.orders} הזמנות{lastWeek.revenue?` · ₪${lastWeek.revenue.toLocaleString('he-IL')}`:""}</div>}
           </>)}
         </div>
       </div>
@@ -878,7 +910,7 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
       </div>
       <Body>
         {tab==="orders"    && <OrdersTab coord={coord} time={time} showToast={showToast}/>}
-        {tab==="messages"  && <MessagesTab coord={coord} time={time} week={week} pilot={pilot} driver={driver} waGroupLink={waGroupLink} justGraduated={justGraduated} showToast={showToast}/>}
+        {tab==="messages"  && <MessagesTab coord={coord} time={time} week={week} pilot={pilot} driver={driver} waGroupLink={waGroupLink} justGraduated={justGraduated} beatLastWeek={beatLastWeek} beatOrders={beatOrders} beatRevenue={beatRevenue} lastWeek={lastWeek} orderCount={orderCount} totalRev={totalRev} hitMemberTarget={hitMemberTarget} memberEntry={memberEntry} showToast={showToast}/>}
         {tab==="reminders" && <RemindersTab coord={coord} pilot={pilot} activeReminders={activeReminders} waGroupLink={waGroupLink} history={history} showToast={showToast}/>}
         {tab==="faq"       && <FaqTab/>}
       </Body>
@@ -934,7 +966,7 @@ function OrdersTab({coord,time,showToast}) {
   );
 }
 
-function MessagesTab({coord,time,week,pilot,driver,waGroupLink,justGraduated,showToast}) {
+function MessagesTab({coord,time,week,pilot,driver,waGroupLink,justGraduated,beatLastWeek,beatOrders,beatRevenue,lastWeek,orderCount,totalRev,hitMemberTarget,memberEntry,showToast}) {
   const storeLink=getStoreLink();
   const weekLabel = pilot?.status==="pilot" ? `פיילוט שבוע ${pilot.week}/4` : `שבוע ${week?.num||1}`;
   const msgs=[
@@ -947,8 +979,18 @@ function MessagesTab({coord,time,week,pilot,driver,waGroupLink,justGraduated,sho
   if(driver?.phone) msgs.push({title:`🚐 ${driver.name||"הנהג שלך"}`,sub:fmtPhone(driver.phone),color:"#6b7280",text:`הנהג שלך: ${driver.name||""}\n${fmtPhone(driver.phone)} 📞`});
   const graduationMsg = `🎉 *כל הכבוד — השלמנו את הפיילוט!*\n\nחברים, 4 שבועות עברנו ביחד והפכנו לנקודת חלוקה קבועה של פופ ישראל 🌿\n\nתודה לכל אחד ואחת שהזמין, שיתף, ותמך — יחד עשינו את זה! 💚\n\nמעכשיו אנחנו ממשיכים לצמוח יחד, שבוע אחרי שבוע.\n\nמי שעוד לא הזמין — החנות פתוחה כרגיל 👇\n${getStoreLink()}`;
 
+  const beatMsg = beatOrders&&beatRevenue
+    ? `🔥 *שברנו שיא השבוע!*\n\n${orderCount} הזמנות ו-₪${totalRev.toLocaleString('he-IL')} — יותר מכל שבוע עד עכשיו!\n\nתודה לכולם שהזמינו ושהמליצו 💚\nיחד אנחנו גדלים שבוע אחרי שבוע 🌿`
+    : beatOrders
+    ? `🔥 *שברנו שיא בהזמנות!*\n\n${orderCount} הזמנות השבוע — יותר מהשבוע שעבר (${lastWeek?.orders})!\n\nתודה לכולם שהזמינו ושהמליצו 💚\nיחד אנחנו גדלים שבוע אחרי שבוע 🌿`
+    : `🔥 *שברנו שיא בסכום!*\n\n₪${totalRev.toLocaleString('he-IL')} השבוע — יותר מהשבוע שעבר (₪${lastWeek?.revenue.toLocaleString('he-IL')})!\n\nתודה לכולם שהזמינו ושהמליצו 💚\nיחד אנחנו גדלים שבוע אחרי שבוע 🌿`;
+
+  const membersMsg = `🏆 *הגענו ל-${memberEntry?.count} חברים בקבוצה!*\n\nזה לא מובן מאליו — כל אחד ואחת מכם הוסיף חבר, שיתף לינק, המליץ לשכן.\n\nתודה שאתם חלק מהתנועה 🌿\n\nביחד אנחנו יוצרים משהו אמיתי 💚`;
+
   return <>
     {justGraduated&&<CopyCard title="🎉 סיימנו פיילוט!" sub="שלח לקבוצה — הישג משותף" color="#f59e0b" text={graduationMsg} showToast={showToast}/>}
+    {hitMemberTarget&&<CopyCard title={`🏆 הגענו ל-${memberEntry?.count} חברים!`} sub="שלח לקבוצה — אבן דרך" color="#7c3aed" text={membersMsg} showToast={showToast}/>}
+    {beatLastWeek&&<CopyCard title="🔥 שברנו את השיא!" sub="שלח לקבוצה — מוטיבציה לשבוע הבא" color="#059669" text={beatMsg} showToast={showToast}/>}
     {msgs.slice(0,3).map((m,i)=><CopyCard key={i} {...m} showToast={showToast}/>)}
     <div style={{background:"#fffbeb",border:"1.5px solid #fcd34d",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
       <p style={{fontSize:12,fontWeight:800,color:"#92400e",marginBottom:6}}>📞 למי פונים?</p>
