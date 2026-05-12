@@ -68,11 +68,27 @@ const COORD_MANUAL = [
   { coordKey: 'אוסנת', coordName: 'אוסנת', city: 'טבעון' },
 ];
 
+// תאריכי השקה — נשמרים כאן כדי שלא ימחקו בעדכון גיליון
+const LAUNCH_DATES = {
+  'טל': '1.1.26', 'נעמה': '1.1.26', 'בילי': '1.1.26',
+  'Sivan-Cohen-Gvili': '1.1.26', 'אורטל': '1.1.26', 'מורן': '1.1.26',
+  'טליה-ישראלי': '1.1.26', 'ורד-בן-בסה': '1.1.26', 'מירי-ליסק': '1.1.26',
+  'הודיה-נובחוב': '1.1.26', 'אירן-דיכנו': '1.1.26', 'רוני-שפי': '1.1.26',
+  'אמילי-כהן': '1.1.26', 'שקד-נוימן': '1.1.26', 'רביד-אטיא': '1.1.26',
+  'אוסנת': '1.1.26', 'מיטל-כהן': '1.1.26', 'מירב-סארמילי': '1.1.26',
+  'חנה-פיסינגר': '1.1.26', 'מאיה': '12.4.26', 'אדם-פליישמן': '12.4.26',
+  'כנרת-דן-מטפלת-רגשית': '26.4.26', 'מיכה-לויט': '26.4.26',
+  "אליזבת'-גולדברג": '26.4.26',
+  'ליבי': '3.5.26', 'מור-אשל': '3.5.26',
+  'מעיין-בל-אטד': '10.5.26', 'Miryam-Caspi': '10.5.26',
+};
+
 // ── POST /api/coordinators — refresh.js posts active coordinator list here
 app.post('/api/coordinators', (req, res) => {
   const raw = Array.isArray(req.body) ? req.body : null;
   if (!raw) return res.status(400).json({ error: 'invalid' });
-  const list = [...raw.filter(c => !COORD_BLOCKLIST.has(c.coordKey)), ...COORD_MANUAL];
+  const list = [...raw.filter(c => !COORD_BLOCKLIST.has(c.coordKey)), ...COORD_MANUAL]
+    .map(c => LAUNCH_DATES[c.coordKey] ? { ...c, launchDate: LAUNCH_DATES[c.coordKey] } : c);
   coordList = list;
   fs.writeFileSync(COORD_FILE, JSON.stringify(list, null, 2));
   console.log(`📋 רכזים עודכנו — ${list.length} פעילות`);

@@ -484,7 +484,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
       </GreenHeader>
 
       <div style={{background:"#1a3c2e",display:"flex",borderBottom:"2px solid #2d6a4f",overflowX:"auto"}}>
-        {[["checklist","✅"],["overview","📊"],["coords","🔗"],["members","👥"],["drivers","🚐"],["walinks","💬"],["progress","📈"]].map(([k,l])=>(
+        {[["checklist","✅"],["overview","📊"],["coords","🔗"],["members","👥"],["drivers","🚐"],["walinks","💬"]].map(([k,l])=>(
           <div key={k} onClick={()=>setAdTab(k)} style={{flex:"0 0 auto",padding:"10px 14px",textAlign:"center",fontSize:18,color:adTab===k?"#ffd166":"rgba(255,255,255,.45)",borderBottom:adTab===k?"2px solid #ffd166":"2px solid transparent",cursor:"pointer",marginBottom:-2}}>
             {l}
           </div>
@@ -559,10 +559,13 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
         </>}
 
         {adTab==="members" && <>
+          <input value={search} onChange={e=>setSearch(e.target.value)}
+            placeholder="🔍 חיפוש לפי שם או עיר..."
+            style={{...S.input,marginBottom:12,fontSize:14}}/>
           <Card>
             <p style={{...T.cardTitle,marginBottom:6}}>👥 חברי קבוצות</p>
             <p style={{fontSize:11,color:"#6b7280",marginBottom:14}}>עדכני פעם בשבוע — מספר חברים בקבוצת וואטסאפ ותאריך הצטרפות אחרון</p>
-            {coords.map(c=>{
+            {filteredCoords.map(c=>{
               const e=localMembers[c.coordKey]||{};
               return (
                 <div key={c.coordKey} style={{padding:"10px 0",borderBottom:"1px solid #e8ede9"}}>
@@ -588,9 +591,12 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
         </>}
 
         {adTab==="drivers" && <>
+          <input value={search} onChange={e=>setSearch(e.target.value)}
+            placeholder="🔍 חיפוש לפי שם או עיר..."
+            style={{...S.input,marginBottom:12,fontSize:14}}/>
           <Card>
             <p style={{...T.cardTitle,marginBottom:6}}>🚐 נהגים</p>
-            {coords.map(c=>{
+            {filteredCoords.map(c=>{
               const d=localDrivers[c.coordKey]||{};
               return (
                 <div key={c.coordKey} style={{padding:"12px 0",borderBottom:"1px solid #e8ede9"}}>
@@ -607,9 +613,12 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
         </>}
 
         {adTab==="walinks" && <>
+          <input value={search} onChange={e=>setSearch(e.target.value)}
+            placeholder="🔍 חיפוש לפי שם או עיר..."
+            style={{...S.input,marginBottom:12,fontSize:14}}/>
           <Card>
             <p style={{...T.cardTitle,marginBottom:6}}>💬 לינקי קבוצת וואטסאפ</p>
-            {coords.map(c=>(
+            {filteredCoords.map(c=>(
               <div key={c.coordKey} style={{padding:"10px 0",borderBottom:"1px solid #e8ede9"}}>
                 <div style={{fontWeight:700,fontSize:13,marginBottom:6}}><CoordName name={c.coordName}/> <span style={{color:"#6b7280",fontWeight:400}}>— {c.city}</span></div>
                 <input value={localWaLinks[c.coordKey]||""} onChange={e=>setLocalWaLinks({...localWaLinks,[c.coordKey]:e.target.value})}
@@ -620,34 +629,6 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
           </Card>
         </>}
 
-        {adTab==="progress" && <>
-          <Card>
-            <p style={{...T.cardTitle,marginBottom:16}}>📈 פיילוט 4 שבועות</p>
-            {[1,2,3,4].map(wn=>{
-              const pw=(progress||[]).find(p=>p.week===wn);
-              const isCurrent=wn===week.num;
-              return (
-                <div key={wn} style={{padding:"12px 0",borderBottom:"1px solid #e8ede9"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:isCurrent?8:0}}>
-                    <div style={{...S.stepNum,background:pw?"#2d6a4f":"#d1d5db"}}>{wn}</div>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:13,fontWeight:700,color:pw?"#1a3c2e":"#9ca3af"}}>שבוע {wn} {isCurrent?"← נוכחי":""}</div>
-                      {pw&&<div style={{fontSize:11,color:"#6b7280"}}>{pw.orders} הזמנות{pw.members!=null?` · ${pw.members} חברים`:""}</div>}
-                    </div>
-                    {isCurrent&&<div style={{background:"#dcfce7",color:"#166534",fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:99}}>פעיל</div>}
-                  </div>
-                  {isCurrent&&<div style={{display:"flex",gap:8}}>
-                    <input type="number" placeholder="כמה חברים בקבוצה?" min={0}
-                      value={membersInput[wn]||""}
-                      onChange={e=>setMembersInput({...membersInput,[wn]:e.target.value})}
-                      style={{...S.input,flex:1}}/>
-                    <button style={S.btnSmall} onClick={()=>onUpdateMembers(wn,parseInt(membersInput[wn])||0)}>✅</button>
-                  </div>}
-                </div>
-              );
-            })}
-          </Card>
-        </>}
       </Body>
       <Toast msg={toast}/>
     </Screen>
@@ -772,7 +753,7 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
         </div>
         <div style={{fontSize:13,opacity:.7,marginTop:2}}>📍 {coord.city||coord.deliveryStr}</div>
         {(()=>{
-          const activeWeeks = pilot.status==="pilot" ? pilot.week : Math.max((history?.length||0)+1, 1);
+          const activeWeeks = pilot.status==="pilot" ? pilot.week : pilot.launch ? Math.floor((Date.now()-pilot.launch.getTime())/(7*24*3600*1000))+1 : Math.max((history?.length||0)+1, 1);
           const isPilot = pilot.status==="pilot";
           const bars = isPilot ? 4 : Math.min(activeWeeks, 8);
           return (
