@@ -727,26 +727,33 @@ function ChecklistTab({staleCoords,coords}){
 
   const today=new Date().getDay();
 
+  const GRAD_GROUP="https://chat.whatsapp.com/K0Kzwgow1NDBeCFzAqIL6t";
   const DAYS=[
     {n:0, label:"ראשון", tasks:[
       {id:"s1",text:"📢 שלח הודעת פתיחת חנות לכל הרכזים — החנות נפתחת ב-19:00"},
       {id:"s2",text:"🤖 שלח אוטומציה למזמינים שהזמינו בפעם הראשונה השבוע"},
-      {id:"s3",text:"🆕 שלח ברוך הבא למזמינים חדשים משבוע שעבר"},
+      {id:"s3",text:"📁 תייק לדרייב את המכירות משבוע שעבר"},
+      {id:"s4",text:"🌙 בדוק פגישות למחרת"},
     ]},
     {n:1, label:"שני", tasks:[
-      {id:"m1",text:"🧺 הזמן סל רכזים לשבוע הבא (לפני 14:00!)"},
-      {id:"m2",text:"💬 המשך להגיב למי שהגיב לאוטומציה — הנע לרכישה ולשיתוף חברים"},
+      {id:"m1",text:"🧺 תזכיר לרכזי פיילוט להזמין סל לשבוע הבא (לפני 14:00!)"},
+      {id:"m2",text:"📊 בדוק סטטוס הזמנות — מי ב🔴 ומי צריך עזרה?"},
+      {id:"m3",text:"💬 המשך להגיב למי שהגיב לאוטומציה — הנע לרכישה ולשיתוף חברים"},
+      {id:"m4",text:"🌙 בדוק פגישות למחרת"},
     ]},
     {n:2, label:"שלישי", tasks:[
       {id:"t1",text:"📊 בדוק סטטוס הזמנות — מי ב🔴 ומי צריך עזרה?"},
+      {id:"t2",text:"🌙 בדוק פגישות למחרת"},
     ]},
     {n:3, label:"רביעי", tasks:[
-      {id:"w1",text:"🔔 שלח תזכורת לרכזים — מחר יום אחרון להזמנות!"},
+      {id:"w1",text:"📊 בדוק סטטוס הזמנות — מי ב🔴 ומי צריך עזרה?"},
+      {id:"w2",text:"🔔 שלח תזכורת לרכזי פיילוט — מחר יום אחרון להזמנות!"},
+      {id:"w3",text:"🌙 בדוק פגישות למחרת"},
     ]},
     {n:4, label:"חמישי", tasks:[
-      {id:"h1",text:"⏰ שלח תזכורת אחרונה לפני סגירת ההזמנות ב-8:00"},
-      {id:"h2",text:"🚐 מלא נהגים לכל הרכזים (טאב 🚐)"},
-      {id:"h3",text:"👥 עדכן מספר משתתפים + מצטרף אחרון בכל קבוצת וואטסאפ (טאב 👥)"},
+      {id:"h1",text:"🚐 מלא נהגים לכל הרכזים (טאב 🚐)"},
+      {id:"h2",text:"👥 עדכן מספר משתתפים + מצטרף אחרון בכל קבוצת וואטסאפ (טאב 👥)"},
+      {id:"h3",text:"🌙 בדוק פגישות למחרת"},
     ]},
   ];
 
@@ -769,6 +776,56 @@ function ChecklistTab({staleCoords,coords}){
         </Card>
       );
     })}
+    {(()=>{
+      const MIN_ORD=5;
+      const graduated=(coords||[]).filter(c=>{
+        const p=pilotInfo(c.launchDate);
+        if(p.status!=='regular'||!p.launch) return false;
+        const days=(Date.now()-p.launch.getTime())/86400000;
+        return days<35;
+      });
+      if(!graduated.length) return null;
+      return (
+        <Card style={{borderRight:"4px solid #f59e0b",background:"#fffbeb"}}>
+          <p style={{...T.cardTitle,marginBottom:4,color:"#92400e"}}>🎓 פיילוט הסתיים — נדרשת פעולה</p>
+          <p style={{fontSize:11,color:"#6b7280",marginBottom:12}}>{graduated.length} רכזים סיימו 4 שבועות</p>
+          {graduated.map(c=>{
+            const passed=c.orders.length>=MIN_ORD;
+            const TASKS_PASS=[
+              "✍️ שלח הודעה אישית — מזל טוב על השלמת פיילוט בהצלחה! 🎉",
+              "👥 הוסף לקבוצת רכזים שעברו פיילוט",
+              "💬 הסבר שינוי אסטרטגיה — פרסומים מהקבוצה (כ-7 בשבוע) במקום הודעות אישיות",
+            ];
+            const TASKS_FAIL=[
+              "✍️ שלח הודעה אישית — תודה על הנכונות, לא עברנו את הסף המינימלי 🙏",
+            ];
+            const tasks=passed?TASKS_PASS:TASKS_FAIL;
+            return (
+              <div key={c.coordKey} style={{marginBottom:12,borderBottom:"1px solid #fde68a",paddingBottom:12}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <div style={{fontWeight:700,fontSize:13}}><CoordName name={c.coordName}/></div>
+                  <span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:20,
+                    background:passed?"#dcfce7":"#fee2e2",color:passed?"#166534":"#991b1b"}}>
+                    {passed?"✅ עברה":"❌ לא עברה"} · {c.orders.length} הז׳
+                  </span>
+                </div>
+                {tasks.map((task,i)=>{
+                  const tid=`grad_${c.coordKey}_${i}`;
+                  return <CheckItem key={tid} text={task} done={!!checked[tid]} onToggle={()=>toggle(tid)}/>;
+                })}
+                {passed&&(
+                  <a href={GRAD_GROUP} target="_blank" rel="noopener noreferrer"
+                    style={{display:"inline-flex",alignItems:"center",gap:5,marginTop:8,fontSize:12,
+                      color:"#15803d",textDecoration:"none",fontWeight:600}}>
+                    🔗 פתח קבוצת רכזים שעברו פיילוט ↗
+                  </a>
+                )}
+              </div>
+            );
+          })}
+        </Card>
+      );
+    })()}
     {staleCoords.length>0&&(
       <Card style={{borderRight:"4px solid #f59e0b"}}>
         <p style={{...T.cardTitle,marginBottom:10,color:"#b45309"}}>⚠️ לא עודכן — חברי קבוצה</p>
