@@ -26,5 +26,6 @@
     { "coordKey": "ליבי",                      "coordName": "ליבי",                 "city": "תלמז",                       "launchDate": "3.5.26" },
     { "coordKey": "מעיין-בל-אטד",              "coordName": "מעיין בל אטד",         "city": "גן יבנה",                    "launchDate": "10.5.26" },
     { "coordKey": "מור-אשל",                   "coordName": "מור אשל",              "city": "כרמי יוסף",                  "launchDate": "3.5.26" },
-    { "coordKey": "Miryam-Caspi",             "coordName": "Miryam Caspi",         "city": "בית גמליאל",                 "launchDate": "10.5.26" }
+    { "coordKey": "Miryam-Caspi",             "coordName": "Miryam Caspi",         "city": "בית גמליאל",                 "launchDate": "10.5.26" },
+    { "coordKey": "רחלי",                     "coordName": "רחלי",                 "city": "אביחיל",                     "launchDate": "1.1.26" }
 ]

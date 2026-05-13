@@ -66,6 +66,7 @@ const COORD_BLOCKLIST = new Set([
 // רכזים ידניים שמוחלפים/נוספים ללא תלות בגיליון
 const COORD_MANUAL = [
   { coordKey: 'אוסנת', coordName: 'אוסנת', city: 'טבעון' },
+  { coordKey: 'רחלי',  coordName: 'רחלי',  city: 'אביחיל' },
 ];
 
 // תאריכי השקה — נשמרים כאן כדי שלא ימחקו בעדכון גיליון
@@ -81,6 +82,7 @@ const LAUNCH_DATES = {
   "אליזבת'-גולדברג": '26.4.26',
   'ליבי': '3.5.26', 'מור-אשל': '3.5.26',
   'מעיין-בל-אטד': '10.5.26', 'Miryam-Caspi': '10.5.26',
+  'רחלי': '1.1.26',
 };
 
 // ── POST /api/coordinators — refresh.js posts active coordinator list here
