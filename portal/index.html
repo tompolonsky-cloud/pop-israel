@@ -848,6 +848,12 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
   const missing=MIN_ORDERS-orderCount;
   const daysSinceLaunch = pilot.launch ? Math.floor((Date.now()-pilot.launch.getTime())/(24*3600*1000)) : 999;
   const justGraduated = isRegular && daysSinceLaunch < 35;
+  // pilotPassed: majority of recorded weeks had ≥5 orders; if no history, check current week
+  const pilotPassed = justGraduated && (()=>{
+    if (!history || history.length === 0) return orderCount >= MIN_ORDERS;
+    const good = history.filter(h=>(h.orders||0) >= MIN_ORDERS).length;
+    return good >= Math.ceil(history.length / 2);
+  })();
   const prevWeeks = (history||[]).filter(h=>h.week!==week?.num).sort((a,b)=>a.week-b.week);
   const lastWeek = prevWeeks.length ? prevWeeks[prevWeeks.length-1] : null;
   const beatOrders = lastWeek && orderCount > lastWeek.orders;
@@ -879,7 +885,8 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
           <div style={{fontSize:24,fontWeight:900}}>שלום {coord.coordName}! {belowMin?"⚠️":"🌿"}</div>
           {pilot.status==="pilot"&&<div style={{background:"#ffd166",color:"#1a3c2e",fontSize:11,fontWeight:900,padding:"3px 10px",borderRadius:99}}>פיילוט שבוע {pilot.week}/4</div>}
           {isRegular&&!justGraduated&&<div style={{background:"rgba(255,255,255,.2)",color:"#fff",fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:99}}>✅ נקודה קבועה</div>}
-          {justGraduated&&<div style={{background:"#ffd166",color:"#1a3c2e",fontSize:11,fontWeight:900,padding:"3px 10px",borderRadius:99,animation:"pulse 1s ease-in-out infinite alternate"}}>🎉 סיימת פיילוט!</div>}
+          {justGraduated&&pilotPassed&&<div style={{background:"#ffd166",color:"#1a3c2e",fontSize:11,fontWeight:900,padding:"3px 10px",borderRadius:99,animation:"pulse 1s ease-in-out infinite alternate"}}>🎉 סיימת פיילוט!</div>}
+          {justGraduated&&!pilotPassed&&<div style={{background:"rgba(255,255,255,.15)",color:"#fff",fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:99}}>🙏 תודה על הנכונות</div>}
         </div>
         <div style={{fontSize:13,opacity:.7,marginTop:2}}>📍 {coord.city||coord.deliveryStr}</div>
         {(()=>{
@@ -904,13 +911,19 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
             </div>
           );
         })()}
-        {justGraduated&&(
+        {justGraduated&&pilotPassed&&(
           <div style={{position:'relative',overflow:'hidden',marginTop:16,background:'rgba(255,209,102,.18)',border:'1.5px solid #ffd166',borderRadius:14,padding:'16px 16px 14px'}}>
             <Confetti/>
             <div style={{position:'relative',zIndex:6}}>
               <div style={{fontSize:22,fontWeight:900,marginBottom:4}}>🎉 כל הכבוד!</div>
               <div style={{fontSize:13,lineHeight:1.6,opacity:.95}}>השלמת 4 שבועות של פיילוט — אתם עכשיו <strong>נקודת חלוקה קבועה</strong> של פופ ישראל 🌿</div>
             </div>
+          </div>
+        )}
+        {justGraduated&&!pilotPassed&&(
+          <div style={{marginTop:16,background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.25)',borderRadius:14,padding:'16px 16px 14px'}}>
+            <div style={{fontSize:18,fontWeight:900,marginBottom:6}}>🙏 תודה רבה על הנכונות</div>
+            <div style={{fontSize:13,lineHeight:1.7,opacity:.9}}>4 שבועות של פיילוט הסתיימו — תודה על המאמץ, הזמן והנכונות שלך. זה לא פשוט, ואנחנו מעריכים מאוד.</div>
           </div>
         )}
         {hitMemberTarget&&(
@@ -1008,7 +1021,7 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
       </div>
       <Body>
         {tab==="orders"    && <OrdersTab coord={coord} time={time} showToast={showToast}/>}
-        {tab==="messages"  && <MessagesTab coord={coord} time={time} week={week} pilot={pilot} driver={driver} waGroupLink={waGroupLink} justGraduated={justGraduated} beatLastWeek={beatLastWeek} beatOrders={beatOrders} beatRevenue={beatRevenue} lastWeek={lastWeek} orderCount={orderCount} totalRev={totalRev} hitMemberTarget={hitMemberTarget} memberEntry={memberEntry} showToast={showToast}/>}
+        {tab==="messages"  && <MessagesTab coord={coord} time={time} week={week} pilot={pilot} driver={driver} waGroupLink={waGroupLink} justGraduated={justGraduated} pilotPassed={pilotPassed} beatLastWeek={beatLastWeek} beatOrders={beatOrders} beatRevenue={beatRevenue} lastWeek={lastWeek} orderCount={orderCount} totalRev={totalRev} hitMemberTarget={hitMemberTarget} memberEntry={memberEntry} showToast={showToast}/>}
         {tab==="reminders" && <RemindersTab coord={coord} pilot={pilot} activeReminders={activeReminders} waGroupLink={waGroupLink} history={history} showToast={showToast}/>}
         {tab==="faq"       && <FaqTab/>}
       </Body>
@@ -1074,7 +1087,7 @@ function OrdersTab({coord,time,showToast}) {
   );
 }
 
-function MessagesTab({coord,time,week,pilot,driver,waGroupLink,justGraduated,beatLastWeek,beatOrders,beatRevenue,lastWeek,orderCount,totalRev,hitMemberTarget,memberEntry,showToast}) {
+function MessagesTab({coord,time,week,pilot,driver,waGroupLink,justGraduated,pilotPassed,beatLastWeek,beatOrders,beatRevenue,lastWeek,orderCount,totalRev,hitMemberTarget,memberEntry,showToast}) {
   const storeLink=getStoreLink();
   const weekLabel = pilot?.status==="pilot" ? `פיילוט שבוע ${pilot.week}/4` : `שבוע ${week?.num||1}`;
   const msgs=[
@@ -1096,7 +1109,8 @@ function MessagesTab({coord,time,week,pilot,driver,waGroupLink,justGraduated,bea
   const membersMsg = `🏆 *הגענו ל-${memberEntry?.count} חברים בקבוצה!*\n\nזה לא מובן מאליו — כל אחד ואחת מכם הוסיף חבר, שיתף לינק, המליץ לשכן.\n\nתודה שאתם חלק מהתנועה 🌿\n\nביחד אנחנו יוצרים משהו אמיתי 💚`;
 
   return <>
-    {justGraduated&&<CopyCard title="🎉 סיימנו פיילוט!" sub="שלח לקבוצה — הישג משותף" color="#f59e0b" text={graduationMsg} showToast={showToast}/>}
+    {justGraduated&&pilotPassed&&<CopyCard title="🎉 סיימנו פיילוט!" sub="שלח לקבוצה — הישג משותף" color="#f59e0b" text={graduationMsg} showToast={showToast}/>}
+    {justGraduated&&!pilotPassed&&<CopyCard title="🙏 תודה על הנכונות" sub="שלח לקבוצה — סיום הפיילוט" color="#92400e" text={`תודה רבה לכל אחד מכם על הנכונות להיות חלק מהפיילוט שלנו 🙏\n\nזה לא מובן מאליו — ההשתתפות שלכם, ולו גם בצעד אחד, מאוד משמעותית לנו.\n\nנשמח לראות אתכם שוב בפופ ישראל בעתיד 🌿`} showToast={showToast}/>}
     {hitMemberTarget&&<CopyCard title={`🏆 הגענו ל-${memberEntry?.count} חברים!`} sub="שלח לקבוצה — אבן דרך" color="#7c3aed" text={membersMsg} showToast={showToast}/>}
     {beatLastWeek&&<CopyCard title="🔥 שברנו את השיא!" sub="שלח לקבוצה — מוטיבציה לשבוע הבא" color="#059669" text={beatMsg} showToast={showToast}/>}
     {msgs.slice(0,3).map((m,i)=><CopyCard key={i} {...m} showToast={showToast}/>)}
