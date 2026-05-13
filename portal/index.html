@@ -107,6 +107,7 @@ const K_MEMBERS    = "pop_v6_members";
 const K_DELIV_DAYS = "pop_v6_delivdays";
 const K_GRP_NAMES  = "pop_v6_grpnames";
 const K_PHONES     = "pop_v6_phones";
+const K_CUSTOMERS  = "pop_v6_customers";
 
 // ══════════════════════════════════════════════
 // HELPERS
@@ -306,6 +307,7 @@ function App() {
   const [deliveryDays,  setDeliveryDays]  = useState({});
   const [groupNames,    setGroupNames]    = useState({});
   const [coordPhones,   setCoordPhones]   = useState({});
+  const [allTimeCustomers, setAllTimeCustomers] = useState({});
   const [adminTab,      setAdminTab]      = useState("overview");
   const [selCoord,  setSelCoord] = useState(null);
   const [tab,       setTab]      = useState("orders");
@@ -341,6 +343,7 @@ function App() {
     const dd = sto_get(K_DELIV_DAYS);if(dd) setDeliveryDays(dd);
     const gn = sto_get(K_GRP_NAMES); if(gn) setGroupNames(gn);
     const ph = sto_get(K_PHONES);    if(ph) setCoordPhones(ph);
+    const cu = sto_get(K_CUSTOMERS); if(cu) setAllTimeCustomers(cu);
 
     // Fetch server settings (secretary writes here, all portals read)
     try {
@@ -354,7 +357,8 @@ function App() {
       if (sv.memberData)    { setMemberData(sv.memberData);       sto_set(K_MEMBERS,    sv.memberData);     }
       if (sv.deliveryDays)  { setDeliveryDays(sv.deliveryDays);   sto_set(K_DELIV_DAYS, sv.deliveryDays);  }
       if (sv.groupNames)    { setGroupNames(sv.groupNames);        sto_set(K_GRP_NAMES,  sv.groupNames);    }
-      if (sv.coordPhones)   { setCoordPhones(sv.coordPhones);     sto_set(K_PHONES,     sv.coordPhones);   }
+      if (sv.coordPhones)      { setCoordPhones(sv.coordPhones);           sto_set(K_PHONES,     sv.coordPhones);        }
+      if (sv.allTimeCustomers) { setAllTimeCustomers(sv.allTimeCustomers); sto_set(K_CUSTOMERS, sv.allTimeCustomers); }
     } catch(e) {}
 
     try {
@@ -374,6 +378,24 @@ function App() {
         // enrich coords with stored phones as fallback
         const enriched = merged.map(c => ({...c, coordPhone: c.coordPhone || updatedPh[c.coordKey] || ''}));
         setCoords(enriched);
+        // accumulate all-time customers: phone → {name, phone}; name-only → {name}
+        const storedCust = sto_get(K_CUSTOMERS) || {};
+        const updatedCust = JSON.parse(JSON.stringify(storedCust)); // deep clone
+        enriched.forEach(c => {
+          if (!updatedCust[c.coordKey]) updatedCust[c.coordKey] = {};
+          c.orders.forEach(o => {
+            if (o.phone) {
+              // if same phone exists keep the latest name
+              updatedCust[c.coordKey][o.phone] = { name: o.name || updatedCust[c.coordKey][o.phone]?.name || '', phone: o.phone };
+            } else if (o.name) {
+              const k = 'n_' + o.name.trim();
+              if (!updatedCust[c.coordKey][k]) updatedCust[c.coordKey][k] = { name: o.name.trim(), phone: '' };
+            }
+          });
+        });
+        setAllTimeCustomers(updatedCust);
+        sto_set(K_CUSTOMERS, updatedCust);
+        postSettings({allTimeCustomers: updatedCust}).catch(()=>{});
         setUpdatedAt(data.updatedAt);
         if (cp) {
           let found = matchCoord(orderCoords, cp);
@@ -484,6 +506,7 @@ function App() {
       updatedAt={updatedAt} history={coordHistory[selCoord?.coordKey]||[]}
       memberEntry={memberData[selCoord?.coordKey]||null}
       rank={coordRank?.rank} totalCoords={coordRank?.total}
+      allCustomers={allTimeCustomers[selCoord?.coordKey]||{}}
       tab={tab} setTab={setTab} toast={toast} showToast={showToast}/>;
 
   return null;
@@ -1056,7 +1079,7 @@ function Confetti({colors}) {
 
 // COORDINATOR SCREEN — same as v5
 // ══════════════════════════════════════════════
-function CoordScreen({coord,driver,waGroupLink,week,onBack,tab,setTab,toast,showToast,updatedAt,history,memberEntry,rank,totalCoords}) {
+function CoordScreen({coord,driver,waGroupLink,week,onBack,tab,setTab,toast,showToast,updatedAt,history,memberEntry,rank,totalCoords,allCustomers={}}) {
   if(!coord) return null;
   const totalRev=coord.orders.reduce((s,o)=>s+o.total,0);
   const orderCount=coord.orders.length;
@@ -1232,7 +1255,7 @@ function CoordScreen({coord,driver,waGroupLink,week,onBack,tab,setTab,toast,show
       )}
 
       <div style={{background:"#fff",borderBottom:"1px solid #e8ede9",display:"flex",marginTop:belowMin?12:0}}>
-        {[["orders","📋"],["messages","📤"],["reminders","🔔"],["faq","❓"]].map(([k,l])=>(
+        {[["orders","📋"],["customers","👥"],["messages","📤"],["reminders","🔔"],["faq","❓"]].map(([k,l])=>(
           <div key={k} onClick={()=>setTab(k)}
             style={{flex:1,padding:"12px 4px",textAlign:"center",fontSize:20,color:tab===k?(belowMin?"#b91c1c":"#2d6a4f"):"#9ca3af",borderBottom:tab===k?`2px solid ${belowMin?"#b91c1c":"#2d6a4f"}`:"2px solid transparent",cursor:"pointer",position:"relative"}}>
             {l}
@@ -1242,6 +1265,7 @@ function CoordScreen({coord,driver,waGroupLink,week,onBack,tab,setTab,toast,show
       </div>
       <Body>
         {tab==="orders"    && <OrdersTab coord={coord} showToast={showToast}/>}
+        {tab==="customers" && <CustomersTab allCustomers={allCustomers} showToast={showToast}/>}
         {tab==="messages"  && <MessagesTab coord={coord} week={week} pilot={pilot} driver={driver} waGroupLink={waGroupLink} justGraduated={justGraduated} pilotPassed={pilotPassed} beatLastWeek={beatLastWeek} beatOrders={beatOrders} beatRevenue={beatRevenue} lastWeek={lastWeek} orderCount={orderCount} totalRev={totalRev} hitMemberTarget={hitMemberTarget} memberEntry={memberEntry} showToast={showToast}/>}
         {tab==="reminders" && <RemindersTab coord={coord} pilot={pilot} activeReminders={activeReminders} waGroupLink={waGroupLink} history={history} showToast={showToast}/>}
         {tab==="faq"       && <FaqTab/>}
@@ -1304,6 +1328,57 @@ function OrdersTab({coord,showToast}) {
       <button onClick={copyList} style={{...S.btn,marginTop:14,background:copied?"#16a34a":"#2d6a4f",transition:"background .3s"}}>
         {copied?"✅ הועתק — הדבק בקבוצה":"📋 העתק רשימה לוואטסאפ"}
       </button>
+    </Card>
+  );
+}
+
+function CustomersTab({allCustomers, showToast}) {
+  const [search, setSearch] = useState('');
+  const list = Object.values(allCustomers)
+    .sort((a,b) => (a.name||'').localeCompare(b.name||'', 'he'));
+  const filtered = search.trim()
+    ? list.filter(c => (c.name||'').includes(search) || (c.phone||'').includes(search))
+    : list;
+  const withPhone = list.filter(c => c.phone).length;
+
+  function copyAll() {
+    const lines = list.map((c,i) => `${i+1}. ${c.name||'—'}${c.phone ? ' — ' + fmtPhone(c.phone) : ''}`);
+    navigator.clipboard.writeText(lines.join('\n'))
+      .then(() => showToast('✅ הרשימה הועתקה'));
+  }
+
+  return (
+    <Card>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+        <p style={T.cardTitle}>👥 לקוחות מכל הזמנים</p>
+        <span style={{fontSize:12,color:'#6b7280',fontWeight:700}}>{list.length} לקוחות · {withPhone} עם טלפון</span>
+      </div>
+      {list.length === 0 ? (
+        <div style={{textAlign:'center',color:'#9ca3af',fontSize:13,padding:'24px 0'}}>אין נתונים עדיין — ייאסף אוטומטית מהשבוע הנוכחי</div>
+      ) : (<>
+        <input
+          value={search} onChange={e=>setSearch(e.target.value)}
+          placeholder="🔍 חיפוש לפי שם או טלפון..."
+          style={{width:'100%',boxSizing:'border-box',border:'1px solid #d1fae5',borderRadius:10,padding:'9px 12px',fontSize:13,marginBottom:10,outline:'none'}}
+        />
+        {filtered.map((c,i) => (
+          <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 0',borderBottom:i<filtered.length-1?'1px solid #f0f4f1':'none'}}>
+            <div style={{width:26,height:26,borderRadius:'50%',background:'#d1fae5',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:900,color:'#2d6a4f',flexShrink:0}}>
+              {(c.name||'?')[0]}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:700,fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name||'—'}</div>
+              {c.phone && <div style={{fontSize:11,color:'#6b7280',direction:'ltr'}}>{fmtPhone(c.phone)}</div>}
+            </div>
+            {c.phone && (
+              <a href={waLink(c.phone)} target="_blank"
+                style={{width:32,height:32,background:'#25d366',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:15,textDecoration:'none',flexShrink:0}}>💬</a>
+            )}
+          </div>
+        ))}
+        {filtered.length === 0 && <div style={{textAlign:'center',color:'#9ca3af',fontSize:13,padding:'16px 0'}}>לא נמצאו תוצאות</div>}
+        <button onClick={copyAll} style={{...S.btn,marginTop:14,background:'#2d6a4f'}}>📋 העתק רשימה מלאה</button>
+      </>)}
     </Card>
   );
 }
