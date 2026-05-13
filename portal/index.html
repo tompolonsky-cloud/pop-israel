@@ -415,7 +415,10 @@ function App() {
 
   function coordLink(c){return`${window.location.origin}${window.location.pathname}#coord=${encodeURIComponent(slugify(c.coordName))}`;}
   function copyCoordLink(c){navigator.clipboard.writeText(coordLink(c)).then(()=>showToast(`📋 לינק ${c.coordName} הועתק`));}
-  function sendCoordWA(c){window.open(`https://wa.me/?text=${encodeURIComponent(`היי ${c.coordName}! 🌿\nהנה הפורטל שלך:\n${coordLink(c)}`)}`); }
+  function sendCoordWA(c){
+    const msg=`היי ${c.coordName}! 🌿\nהנה הפורטל שלך:\n${coordLink(c)}`;
+    window.open(c.coordPhone ? waLink(c.coordPhone,msg) : `https://wa.me/?text=${encodeURIComponent(msg)}`);
+  }
 
   if(view==="loading") return <Screen><Centered><Spinner/><Muted>טוען...</Muted></Centered></Screen>;
   if(view==="error")   return <Screen><Centered><div style={{fontSize:48}}>⚠️</div><p style={{color:"#e63946",fontWeight:700,textAlign:"center"}}>לא נמצאת. בקש לינק מעודכן.</p></Centered></Screen>;
