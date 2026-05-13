@@ -431,7 +431,7 @@ function App() {
   );
 
   if(view==="admin") return <AdminScreen coords={coords} times={times} drivers={drivers} waLinks={waLinks} week={week}
-      notifs={notifs} progress={progress} updatedAt={updatedAt} memberData={memberData}
+      notifs={notifs} progress={progress} updatedAt={updatedAt} memberData={memberData} coordHistory={coordHistory}
       onSaveTimes={saveTimes} onSaveDrivers={saveDrivers} onSaveWaLinks={saveWaLinks} onFireNotif={fireNotif}
       onSaveMemberData={saveMemberData}
       onCoordLink={copyCoordLink} onCoordWA={sendCoordWA}
@@ -490,7 +490,7 @@ const STATUS_EMOJI  = { red:'🔴', yellow:'🟡', green:'🟢' };
 const STATUS_BG     = { red:'#fef2f2', yellow:'#fffbeb', green:'#f0fdf4' };
 const STATUS_BORDER = { red:'#fca5a5', yellow:'#fcd34d', green:'#86efac' };
 
-function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedAt,memberData,onSaveTimes,onSaveDrivers,onSaveWaLinks,onFireNotif,onSaveMemberData,onCoordLink,onCoordWA,onOpenCoord,onUpdateMembers,toast,showToast}) {
+function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedAt,memberData,coordHistory,onSaveTimes,onSaveDrivers,onSaveWaLinks,onFireNotif,onSaveMemberData,onCoordLink,onCoordWA,onOpenCoord,onUpdateMembers,toast,showToast}) {
   const [adTab,setAdTab]=useState("checklist");
   const [search,setSearch]=useState("");
   const [localTimes,setLocalTimes]=useState({...times});
@@ -500,7 +500,10 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
   const [membersInput,setMembersInput]=useState({});
   const [sortBy,setSortBy]=useState('amount-asc');
 
-  const sortedCoords=[...coords].sort((a,b)=>{
+  const pilotCoords  = coords.filter(c=>pilotInfo(c.launchDate).status==='pilot');
+  const regularCoords= coords.filter(c=>pilotInfo(c.launchDate).status!=='pilot');
+
+  const sortedCoords=[...regularCoords].sort((a,b)=>{
     if(sortBy==='alpha') return (a.coordName||'').localeCompare(b.coordName||'','he');
     const ra=a.orders.reduce((s,o)=>s+o.total,0);
     const rb=b.orders.reduce((s,o)=>s+o.total,0);
@@ -548,9 +551,67 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
             ))}
           </div>
 
-          <Card>
+          {pilotCoords.length>0&&(
+            <Card style={{borderRight:'4px solid #3b82f6'}}>
+              <p style={{...T.cardTitle,color:'#1d4ed8',marginBottom:12}}>🔬 פיילוט — {pilotCoords.length} רכזים</p>
+              {[...pilotCoords].sort((a,b)=>(pilotInfo(a.launchDate).week||0)-(pilotInfo(b.launchDate).week||0)).map(c=>{
+                const pilot=pilotInfo(c.launchDate);
+                const hist=(coordHistory||{})[c.coordKey]||[];
+                const memEntry=(memberData||{})[c.coordKey]||{};
+                const curOrders=c.orders.length;
+                const curRev=c.orders.reduce((s,o)=>s+o.total,0);
+                const MIN_ORD=5;
+                return (
+                  <div key={c.coordKey} style={{marginBottom:12,borderBottom:'1px solid #dbeafe',paddingBottom:12}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,cursor:'pointer'}} onClick={()=>onOpenCoord(c)}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <span style={{fontWeight:700,fontSize:13}}><CoordName name={c.coordName}/></span>
+                        <span style={{fontSize:11,color:'#6b7280'}}> — {c.city}</span>
+                      </div>
+                      <span style={{fontSize:11,fontWeight:700,background:'#dbeafe',color:'#1d4ed8',
+                        borderRadius:20,padding:'2px 8px',flexShrink:0}}>ש{pilot.week}/4</span>
+                      {memEntry.count?<span style={{fontSize:11,color:'#6b7280',flexShrink:0}}>👥 {memEntry.count}</span>:null}
+                      <button onClick={e=>{e.stopPropagation();onFireNotif(c);}}
+                        style={{...S.iconBtn,background:'#1a3c2e',color:'#ffd166',flexShrink:0}}>🔔</button>
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:4}}>
+                      {[1,2,3,4].map(w=>{
+                        const isCur=w===pilot.week;
+                        const isPast=w<pilot.week;
+                        const h=hist.find(x=>x.week===w);
+                        const ord=isCur?curOrders:(h!=null?h.orders:null);
+                        const rev=isCur?curRev:(h!=null?h.revenue:null);
+                        const ok=ord!=null&&ord>=MIN_ORD;
+                        return (
+                          <div key={w} style={{
+                            background:isCur?'#eff6ff':isPast?'#fafafa':'#f9fafb',
+                            border:`1px solid ${isCur?'#93c5fd':'#e8ede9'}`,
+                            borderRadius:8,padding:'6px 3px',textAlign:'center',
+                            opacity:(!isCur&&!isPast)?0.4:1}}>
+                            <div style={{fontSize:10,color:'#6b7280',marginBottom:2}}>
+                              ש{w}{isCur?<span style={{color:'#ef4444',fontWeight:900}}> ●</span>:''}
+                            </div>
+                            {ord!=null?(
+                              <>
+                                <div style={{fontSize:14,fontWeight:900,color:ok?'#166534':'#991b1b'}}>{ord}</div>
+                                <div style={{fontSize:10,color:'#6b7280'}}>{rev?'₪'+rev.toLocaleString('he-IL'):''}</div>
+                              </>
+                            ):(
+                              <div style={{fontSize:13,color:'#d1d5db'}}>—</div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </Card>
+          )}
+
+          {regularCoords.length>0&&<Card>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10,flexWrap:'wrap',gap:6}}>
-              <p style={T.cardTitle}>🚦 סטטוס רכזים</p>
+              <p style={T.cardTitle}>🚦 נקודות קבועות — {regularCoords.length}</p>
               <div style={{display:'flex',gap:5}}>
                 {[['amount-asc','₪ ↑'],['amount-desc','₪ ↓'],['alpha','א-ב']].map(([k,l])=>(
                   <button key={k} onClick={()=>setSortBy(k)}
@@ -572,7 +633,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                       <CoordName name={c.coordName}/>
-                      {selfOrdered(c) && <span title="הרכז הזמין לעצמו" style={{marginRight:4,fontSize:11,background:'#dbeafe',color:'#1d4ed8',borderRadius:4,padding:'1px 5px'}}>🛒 עצמי</span>}
+                      {selfOrdered(c)&&<span style={{marginRight:4,fontSize:11,background:'#dbeafe',color:'#1d4ed8',borderRadius:4,padding:'1px 5px'}}>🛒 עצמי</span>}
                     </div>
                     <div style={{fontSize:11,color:'#6b7280'}}>{c.city}</div>
                   </div>
@@ -585,7 +646,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
                 </div>
               );
             })}
-          </Card>
+          </Card>}
 
           {(()=>{
             const reds=sortedCoords.filter(c=>getCoordStatus(c)==='red');
