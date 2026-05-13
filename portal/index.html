@@ -532,7 +532,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
       </GreenHeader>
 
       <div style={{background:"#1a3c2e",display:"flex",borderBottom:"2px solid #2d6a4f",overflowX:"auto"}}>
-        {[["checklist","✅"],["overview","📊"],["coords","🔗"],["members","👥"],["drivers","🚐"],["walinks","💬"]].map(([k,l])=>(
+        {[["checklist","✅"],["overview","📊"],["coords","🔗"],["members","👥"],["drivers","🚐"]].map(([k,l])=>(
           <div key={k} onClick={()=>setAdTab(k)} style={{flex:"0 0 auto",padding:"10px 14px",textAlign:"center",fontSize:18,color:adTab===k?"#ffd166":"rgba(255,255,255,.45)",borderBottom:adTab===k?"2px solid #ffd166":"2px solid transparent",cursor:"pointer",marginBottom:-2}}>
             {l}
           </div>
@@ -612,20 +612,33 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
             style={{...S.input,marginBottom:12,fontSize:14}}/>
           <Card>
             <p style={{...T.cardTitle,marginBottom:14}}>🔗 לינקים אישיים</p>
-            {filteredCoords.map(c=>(
-              <div key={c.coordKey} style={{padding:"11px 0",borderBottom:"1px solid #e8ede9"}}>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:700,fontSize:14}}><CoordName name={c.coordName}/></div>
-                    <div style={{fontSize:11,color:"#6b7280"}}>{c.city} · {c.orders.length} מזמינים</div>
+            {filteredCoords.map(c=>{
+              const grpLink=localWaLinks[c.coordKey]||"";
+              return (
+                <div key={c.coordKey} style={{padding:"11px 0",borderBottom:"1px solid #e8ede9"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:700,fontSize:14}}><CoordName name={c.coordName}/></div>
+                      <div style={{fontSize:11,color:"#6b7280"}}>{c.city} · {c.orders.length} מזמינים</div>
+                    </div>
+                    <button style={S.iconBtn} onClick={()=>onCoordLink(c)}>📋</button>
+                    <button style={{...S.iconBtn,background:"#dcfce7"}} onClick={()=>onCoordWA(c)}>💬</button>
+                    {grpLink
+                      ? <a href={grpLink} target="_blank" rel="noopener noreferrer"
+                          style={{...S.iconBtn,background:"#d1fae5",textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>🌐</a>
+                      : <button style={{...S.iconBtn,background:"#f3f4f6",color:"#9ca3af",cursor:"default"}} disabled>🌐</button>
+                    }
+                    <button style={{...S.iconBtn,background:"#dbeafe"}} onClick={()=>onOpenCoord(c)}>👁️</button>
+                    <button style={{...S.iconBtn,background:"#fef3c7"}} onClick={()=>onFireNotif(c)}>🔔</button>
                   </div>
-                  <button style={S.iconBtn} onClick={()=>onCoordLink(c)}>📋</button>
-                  <button style={{...S.iconBtn,background:"#dcfce7"}} onClick={()=>onCoordWA(c)}>💬</button>
-                  <button style={{...S.iconBtn,background:"#dbeafe"}} onClick={()=>onOpenCoord(c)}>👁️</button>
-                  <button style={{...S.iconBtn,background:"#fef3c7"}} onClick={()=>onFireNotif(c)}>🔔</button>
+                  <input value={grpLink}
+                    onChange={e=>setLocalWaLinks(prev=>({...prev,[c.coordKey]:e.target.value}))}
+                    placeholder="לינק קבוצת וואטסאפ..."
+                    style={{...S.input,fontSize:11,direction:"ltr",padding:"6px 10px",color:"#374151"}}/>
                 </div>
-              </div>
-            ))}
+              );
+            })}
+            <button style={{...S.btn,marginTop:14}} onClick={()=>onSaveWaLinks(localWaLinks)}>💾 שמור לינקים</button>
           </Card>
         </>}
 
@@ -683,22 +696,6 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
           </Card>
         </>}
 
-        {adTab==="walinks" && <>
-          <input value={search} onChange={e=>setSearch(e.target.value)}
-            placeholder="🔍 חיפוש לפי שם או עיר..."
-            style={{...S.input,marginBottom:12,fontSize:14}}/>
-          <Card>
-            <p style={{...T.cardTitle,marginBottom:6}}>💬 לינקי קבוצת וואטסאפ</p>
-            {filteredCoords.map(c=>(
-              <div key={c.coordKey} style={{padding:"10px 0",borderBottom:"1px solid #e8ede9"}}>
-                <div style={{fontWeight:700,fontSize:13,marginBottom:6}}><CoordName name={c.coordName}/> <span style={{color:"#6b7280",fontWeight:400}}>— {c.city}</span></div>
-                <input value={localWaLinks[c.coordKey]||""} onChange={e=>setLocalWaLinks({...localWaLinks,[c.coordKey]:e.target.value})}
-                  placeholder="https://chat.whatsapp.com/..." style={{...S.input,fontSize:12,direction:"ltr"}}/>
-              </div>
-            ))}
-            <button style={{...S.btn,marginTop:14}} onClick={()=>onSaveWaLinks(localWaLinks)}>💾 שמור לינקים</button>
-          </Card>
-        </>}
 
       </Body>
       <Toast msg={toast}/>
