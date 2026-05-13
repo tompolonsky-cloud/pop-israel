@@ -96,14 +96,16 @@ function sto_set(key, val) {
 function sto_get(key) {
   try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : null; } catch(e) { return null; }
 }
-const K_TIMES    = "pop_v6_times";
-const K_WEEK     = "pop_v6_week";
-const K_NOTIFS   = "pop_v6_notifs";
-const K_PROGRESS = "pop_v6_progress";
-const K_DRIVERS  = "pop_v6_drivers";
-const K_WALINKS  = "pop_v6_walinks";
-const K_HISTORY  = "pop_v6_history";
-const K_MEMBERS  = "pop_v6_members";
+const K_TIMES      = "pop_v6_times";
+const K_WEEK       = "pop_v6_week";
+const K_NOTIFS     = "pop_v6_notifs";
+const K_PROGRESS   = "pop_v6_progress";
+const K_DRIVERS    = "pop_v6_drivers";
+const K_WALINKS    = "pop_v6_walinks";
+const K_HISTORY    = "pop_v6_history";
+const K_MEMBERS    = "pop_v6_members";
+const K_DELIV_DAYS = "pop_v6_delivdays";
+const K_GRP_NAMES  = "pop_v6_grpnames";
 
 // ══════════════════════════════════════════════
 // HELPERS
@@ -207,7 +209,6 @@ const COORD_ALIASES = {
   'תל-אביב-תל-כביר': "אליזבת'-גולדברג",
   'תל-כביר': "אליזבת'-גולדברג",
   // ערים ייחודיות
-  'כרמי-יוסף': 'מור-אשל',
   'גן-יבנה': 'מעיין-בל-אטד',
   'בית-גמליאל': 'Miryam-Caspi',
   'תלמז': 'ליבי',
@@ -299,8 +300,11 @@ function App() {
   const [week,      setWeek]     = useState({num:1,label:"שבוע 1",openedAt:null});
   const [notifs,    setNotifs]   = useState([]);
   const [progress,  setProgress] = useState([]);
-  const [coordHistory, setCoordHistory] = useState({});
-  const [memberData,   setMemberData]   = useState({});
+  const [coordHistory,  setCoordHistory]  = useState({});
+  const [memberData,    setMemberData]    = useState({});
+  const [deliveryDays,  setDeliveryDays]  = useState({});
+  const [groupNames,    setGroupNames]    = useState({});
+  const [adminTab,      setAdminTab]      = useState("overview");
   const [selCoord,  setSelCoord] = useState(null);
   const [tab,       setTab]      = useState("orders");
   const [toast,     setToast]    = useState("");
@@ -330,10 +334,10 @@ function App() {
     if(p)  setProgress(p);
     if(dr) setDrivers(dr);
     if(wl) setWaLinks(wl);
-    const ch = sto_get(K_HISTORY);
-    if(ch) setCoordHistory(ch);
-    const md = sto_get(K_MEMBERS);
-    if(md) setMemberData(md);
+    const ch = sto_get(K_HISTORY);   if(ch) setCoordHistory(ch);
+    const md = sto_get(K_MEMBERS);   if(md) setMemberData(md);
+    const dd = sto_get(K_DELIV_DAYS);if(dd) setDeliveryDays(dd);
+    const gn = sto_get(K_GRP_NAMES); if(gn) setGroupNames(gn);
 
     // Fetch server settings (secretary writes here, all portals read)
     try {
@@ -343,8 +347,10 @@ function App() {
       if (sv.drivers && Object.keys(sv.drivers).length)  { setDrivers(sv.drivers); sto_set(K_DRIVERS, sv.drivers); }
       if (sv.waLinks && Object.keys(sv.waLinks).length)  { setWaLinks(sv.waLinks); sto_set(K_WALINKS, sv.waLinks); }
       if (sv.week?.num) { setWeek(sv.week); sto_set(K_WEEK, sv.week); }
-      if (sv.coordHistory) { setCoordHistory(sv.coordHistory); sto_set(K_HISTORY, sv.coordHistory); }
-      if (sv.memberData)   { setMemberData(sv.memberData);     sto_set(K_MEMBERS, sv.memberData);   }
+      if (sv.coordHistory)  { setCoordHistory(sv.coordHistory);   sto_set(K_HISTORY,    sv.coordHistory);   }
+      if (sv.memberData)    { setMemberData(sv.memberData);       sto_set(K_MEMBERS,    sv.memberData);     }
+      if (sv.deliveryDays)  { setDeliveryDays(sv.deliveryDays);   sto_set(K_DELIV_DAYS, sv.deliveryDays);  }
+      if (sv.groupNames)    { setGroupNames(sv.groupNames);        sto_set(K_GRP_NAMES,  sv.groupNames);    }
     } catch(e) {}
 
     try {
@@ -382,7 +388,9 @@ function App() {
   async function saveTimes(t)  { setTimes(t);   sto_set(K_TIMES,t);   await postSettings({times:t});   showToast("✅ שעות נשמרו"); }
   async function saveDrivers(dr){ setDrivers(dr); sto_set(K_DRIVERS,dr); await postSettings({drivers:dr}); showToast("✅ נהגים נשמרו"); }
   async function saveWaLinks(wl){ setWaLinks(wl); sto_set(K_WALINKS,wl); await postSettings({waLinks:wl}); showToast("✅ לינקי קבוצה נשמרו"); }
-  async function saveMemberData(md){ setMemberData(md); sto_set(K_MEMBERS,md); await postSettings({memberData:md}); showToast("✅ נתוני חברים נשמרו"); }
+  async function saveMemberData(md)   { setMemberData(md);   sto_set(K_MEMBERS,   md); await postSettings({memberData:md});   showToast("✅ נתוני חברים נשמרו"); }
+  async function saveDeliveryDays(dd) { setDeliveryDays(dd); sto_set(K_DELIV_DAYS,dd); await postSettings({deliveryDays:dd}); showToast("✅ ימי חלוקה נשמרו"); }
+  async function saveGroupNames(gn)   { setGroupNames(gn);   sto_set(K_GRP_NAMES, gn); await postSettings({groupNames:gn});   showToast("✅ שמות קבוצות נשמרו"); }
 
   async function fireNotif(coord) {
     const t=times[coord.coordKey]||"17:00";
@@ -432,8 +440,9 @@ function App() {
 
   if(view==="admin") return <AdminScreen coords={coords} times={times} drivers={drivers} waLinks={waLinks} week={week}
       notifs={notifs} progress={progress} updatedAt={updatedAt} memberData={memberData} coordHistory={coordHistory}
+      deliveryDays={deliveryDays} groupNames={groupNames} adminTab={adminTab} onAdminTab={setAdminTab}
       onSaveTimes={saveTimes} onSaveDrivers={saveDrivers} onSaveWaLinks={saveWaLinks} onFireNotif={fireNotif}
-      onSaveMemberData={saveMemberData}
+      onSaveMemberData={saveMemberData} onSaveDeliveryDays={saveDeliveryDays} onSaveGroupNames={saveGroupNames}
       onCoordLink={copyCoordLink} onCoordWA={sendCoordWA}
       onOpenCoord={c=>{setSelCoord(c);setTab("orders");setView("coord");}}
       onUpdateMembers={updateMembers} toast={toast} showToast={showToast}/>;
@@ -489,13 +498,19 @@ const STATUS_EMOJI  = { red:'🔴', yellow:'🟡', green:'🟢' };
 const STATUS_BG     = { red:'#fef2f2', yellow:'#fffbeb', green:'#f0fdf4' };
 const STATUS_BORDER = { red:'#fca5a5', yellow:'#fcd34d', green:'#86efac' };
 
-function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedAt,memberData,coordHistory,onSaveTimes,onSaveDrivers,onSaveWaLinks,onFireNotif,onSaveMemberData,onCoordLink,onCoordWA,onOpenCoord,onUpdateMembers,toast,showToast}) {
-  const [adTab,setAdTab]=useState("checklist");
+function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedAt,memberData,coordHistory,
+    deliveryDays={},groupNames={},adminTab='overview',onAdminTab,
+    onSaveTimes,onSaveDrivers,onSaveWaLinks,onFireNotif,onSaveMemberData,onSaveDeliveryDays,onSaveGroupNames,
+    onCoordLink,onCoordWA,onOpenCoord,onUpdateMembers,toast,showToast}) {
+  const adTab=adminTab;
+  const setAdTab=t=>{onAdminTab&&onAdminTab(t);};
   const [search,setSearch]=useState("");
   const [localTimes,setLocalTimes]=useState({...times});
   const [localDrivers,setLocalDrivers]=useState({...drivers});
   const [localWaLinks,setLocalWaLinks]=useState({...waLinks});
   const [localMembers,setLocalMembers]=useState({...memberData});
+  const [localDelivDays,setLocalDelivDays]=useState({...deliveryDays});
+  const [localGrpNames,setLocalGrpNames]=useState({...groupNames});
   const [membersInput,setMembersInput]=useState({});
   const [sortBy,setSortBy]=useState('amount-asc');
 
@@ -624,17 +639,33 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
             {sortedCoords.map(c=>{
               const st=getCoordStatus(c);
               const rev=c.orders.reduce((s,o)=>s+o.total,0);
+              const day=deliveryDays[c.coordKey];
+              const grpLink=waLinks[c.coordKey];
+              const grpName=groupNames[c.coordKey];
               return (
                 <div key={c.coordKey} onClick={()=>onOpenCoord(c)}
                   style={{display:'flex',alignItems:'center',gap:10,padding:'9px 10px',borderRadius:10,
                     background:STATUS_BG[st],border:`1px solid ${STATUS_BORDER[st]}`,marginBottom:6,cursor:'pointer'}}>
                   <span style={{fontSize:15}}>{STATUS_EMOJI[st]}</span>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                      <CoordName name={c.coordName}/>
-                      {selfOrdered(c)&&<span style={{marginRight:4,fontSize:11,background:'#dbeafe',color:'#1d4ed8',borderRadius:4,padding:'1px 5px'}}>🛒 עצמי</span>}
+                    <div style={{fontSize:13,fontWeight:700,display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+                      {c.coordPhone
+                        ?<a href={waLink(c.coordPhone)} target="_blank" rel="noopener noreferrer"
+                            onClick={e=>e.stopPropagation()} style={{color:'inherit',textDecoration:'none'}}>
+                            <CoordName name={c.coordName}/>
+                          </a>
+                        :<CoordName name={c.coordName}/>}
+                      {selfOrdered(c)&&<span style={{fontSize:10,background:'#dbeafe',color:'#1d4ed8',borderRadius:4,padding:'1px 5px'}}>🛒</span>}
+                      {day&&<span style={{fontSize:10,fontWeight:700,background:'#fef3c7',color:'#92400e',borderRadius:4,padding:'1px 6px'}}>יום {day}</span>}
                     </div>
-                    <div style={{fontSize:11,color:'#6b7280'}}>{c.city}</div>
+                    <div style={{fontSize:11,color:'#6b7280',display:'flex',alignItems:'center',gap:5}}>
+                      <span>{c.city}</span>
+                      {grpLink&&<a href={grpLink} target="_blank" rel="noopener noreferrer"
+                          onClick={e=>e.stopPropagation()}
+                          style={{color:'#16a34a',textDecoration:'none',fontWeight:600,fontSize:10}}>
+                          🌐 {grpName||'קבוצה'}
+                        </a>}
+                    </div>
                   </div>
                   <div style={{textAlign:'center',minWidth:60,flexShrink:0}}>
                     <div style={{fontSize:13,fontWeight:900,color:'#1a3c2e'}}>{c.orders.length} הז׳</div>
@@ -690,6 +721,16 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
                     <button style={{...S.iconBtn,background:"#dbeafe"}} onClick={()=>onOpenCoord(c)}>👁️</button>
                     <button style={{...S.iconBtn,background:"#fef3c7"}} onClick={()=>onFireNotif(c)}>🔔</button>
                   </div>
+                  <div style={{display:"grid",gridTemplateColumns:"90px 1fr",gap:6,marginBottom:5}}>
+                    <input value={localDelivDays[c.coordKey]||""}
+                      onChange={e=>setLocalDelivDays(prev=>({...prev,[c.coordKey]:e.target.value}))}
+                      placeholder="יום (ד / ה)"
+                      style={{...S.input,fontSize:11,padding:"6px 8px"}}/>
+                    <input value={localGrpNames[c.coordKey]||""}
+                      onChange={e=>setLocalGrpNames(prev=>({...prev,[c.coordKey]:e.target.value}))}
+                      placeholder="שם קבוצת וואטסאפ"
+                      style={{...S.input,fontSize:11,padding:"6px 10px"}}/>
+                  </div>
                   <input value={grpLink}
                     onChange={e=>setLocalWaLinks(prev=>({...prev,[c.coordKey]:e.target.value}))}
                     placeholder="לינק קבוצת וואטסאפ..."
@@ -697,7 +738,10 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
                 </div>
               );
             })}
-            <button style={{...S.btn,marginTop:14}} onClick={()=>onSaveWaLinks(localWaLinks)}>💾 שמור לינקים</button>
+            <div style={{display:"flex",gap:8,marginTop:14}}>
+              <button style={{...S.btn,flex:1}} onClick={()=>onSaveWaLinks(localWaLinks)}>💾 שמור לינקים</button>
+              <button style={{...S.btn,flex:1}} onClick={()=>{onSaveDeliveryDays&&onSaveDeliveryDays(localDelivDays);onSaveGroupNames&&onSaveGroupNames(localGrpNames);}}>💾 שמור שמות / ימים</button>
+            </div>
           </Card>
         </>}
 
