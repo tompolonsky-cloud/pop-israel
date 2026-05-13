@@ -499,8 +499,14 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
   const [localWaLinks,setLocalWaLinks]=useState({...waLinks});
   const [localMembers,setLocalMembers]=useState({...memberData});
   const [membersInput,setMembersInput]=useState({});
+  const [sortBy,setSortBy]=useState('amount-asc');
 
-  const sortedCoords=[...coords].sort((a,b)=>a.orders.length-b.orders.length);
+  const sortedCoords=[...coords].sort((a,b)=>{
+    if(sortBy==='alpha') return (a.coordName||'').localeCompare(b.coordName||'','he');
+    const ra=a.orders.reduce((s,o)=>s+o.total,0);
+    const rb=b.orders.reduce((s,o)=>s+o.total,0);
+    return sortBy==='amount-asc'?ra-rb:rb-ra;
+  });
   const filteredCoords=search?coords.filter(c=>c.coordName.includes(search)||(c.city||'').includes(search)):coords;
 
   const totalOrders=coords.reduce((s,c)=>s+c.orders.length,0);
@@ -544,11 +550,20 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
           </div>
 
           <Card>
-            <p style={{...T.cardTitle,marginBottom:10}}>🚦 סטטוס רכזים</p>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10,flexWrap:'wrap',gap:6}}>
+              <p style={T.cardTitle}>🚦 סטטוס רכזים</p>
+              <div style={{display:'flex',gap:5}}>
+                {[['amount-asc','₪ ↑'],['amount-desc','₪ ↓'],['alpha','א-ב']].map(([k,l])=>(
+                  <button key={k} onClick={()=>setSortBy(k)}
+                    style={{padding:'4px 10px',borderRadius:20,border:'none',cursor:'pointer',fontSize:12,fontWeight:700,
+                      background:sortBy===k?'#1a3c2e':'#e8ede9',color:sortBy===k?'#ffd166':'#374151'}}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
             {sortedCoords.map(c=>{
               const st=getCoordStatus(c);
-              const pilot=pilotInfo(c.launchDate);
-              const isReg=pilot.status==='regular';
               const rev=c.orders.reduce((s,o)=>s+o.total,0);
               return (
                 <div key={c.coordKey} onClick={()=>onOpenCoord(c)}
@@ -562,11 +577,9 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
                     </div>
                     <div style={{fontSize:11,color:'#6b7280'}}>{c.city}</div>
                   </div>
-                  <div style={{textAlign:'center',minWidth:52,flexShrink:0}}>
-                    <div style={{fontSize:14,fontWeight:900,color:'#1a3c2e'}}>
-                      {isReg?`₪${rev.toLocaleString('he-IL')}`:`${c.orders.length} הז׳`}
-                    </div>
-                    <div style={{fontSize:10,color:'#9ca3af'}}>{isReg?'הכנסות':'הזמנות'}</div>
+                  <div style={{textAlign:'center',minWidth:60,flexShrink:0}}>
+                    <div style={{fontSize:13,fontWeight:900,color:'#1a3c2e'}}>{c.orders.length} הז׳</div>
+                    <div style={{fontSize:12,color:'#5a7a64',fontWeight:600}}>₪{rev.toLocaleString('he-IL')}</div>
                   </div>
                   <button onClick={e=>{e.stopPropagation();onFireNotif(c);}}
                     style={{...S.iconBtn,background:'#1a3c2e',color:'#ffd166',flexShrink:0}}>🔔</button>
