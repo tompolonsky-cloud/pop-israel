@@ -274,16 +274,16 @@ function waLink(phone, msg="") {
 // ══════════════════════════════════════════════
 // MESSAGE BUILDERS
 // ══════════════════════════════════════════════
-function buildStoreOpen(coord, time, weekNum) {
+function buildStoreOpen(coord, _t, weekNum) {
   const link=getStoreLink();
-  return `🔔 *החנות נפתחה!*\nשבוע ${weekNum} | פופ ישראל 🌿\n\nהירקות הגיעו מהחקלאי — הזמינו עכשיו:\n${link}\n\nחלוקה אצל ${coord.coordName} — *${time}*`;
+  return `🔔 *החנות נפתחה!*\nשבוע ${weekNum} | פופ ישראל 🌿\n\nהירקות הגיעו מהחקלאי — הזמינו עכשיו:\n${link}\n\nחלוקה אצל ${coord.coordName}`;
 }
-function buildGroupAnnounce(coord, time, weekNum) {
+function buildGroupAnnounce(coord, _t, weekNum) {
   const link=getStoreLink();
-  return `🌿 *פופ ישראל | שבוע ${weekNum}*\n\nהחנות פתוחה! הזמנות עד יום ראשון בחצות 🌙\n\n👇 להזמנה:\n${link}\n\nחלוקה ${coord.city?"ב"+coord.city:"אצלנו"} — *${time}*\n\nרוצה להמליץ לחבר/ה? שתף/י את הלינק 💚\nיחד נגדל את הקבוצה שלנו!`;
+  return `🌿 *פופ ישראל | שבוע ${weekNum}*\n\nהחנות פתוחה! הזמנות עד יום ראשון בחצות 🌙\n\n👇 להזמנה:\n${link}\n\nחלוקה ${coord.city?"ב"+coord.city:"אצלנו"}\n\nרוצה להמליץ לחבר/ה? שתף/י את הלינק 💚\nיחד נגדל את הקבוצה שלנו!`;
 }
-function buildPersonalMsg(order, coord, time) {
-  return `שלום ${order.name}! 🌿\nהזמנתך אצל ${coord.coordName} מאושרת.\nחלוקה ${time} ב${coord.city||coord.deliveryStr}.${order.total?`\nסכום לתשלום: ₪${order.total}`:""}\nשאלות? ${fmtPhone(CS_PHONE)} 📞`;
+function buildPersonalMsg(order, coord) {
+  return `שלום ${order.name}! 🌿\nהזמנתך אצל ${coord.coordName} מאושרת.\nחלוקה ב${coord.city||coord.deliveryStr}.${order.total?`\nסכום לתשלום: ₪${order.total}`:""}\nשאלות? ${fmtPhone(CS_PHONE)} 📞`;
 }
 
 // ══════════════════════════════════════════════
@@ -453,7 +453,6 @@ function App() {
   })();
 
   if(view==="coord") return <CoordScreen coord={selCoord}
-      time={times[selCoord?.coordKey]||"17:00"}
       driver={drivers[selCoord?.coordKey]||null}
       waGroupLink={waLinks[selCoord?.coordKey]||""}
       week={week} onBack={coordParam?null:()=>setView("admin")}
@@ -841,20 +840,35 @@ function ChecklistTab({staleCoords,coords}){
     {(()=>{
       const newCoords=(coords||[]).filter(c=>{const p=pilotInfo(c.launchDate);return p.status==='pilot'&&p.week===1;});
       if(!newCoords.length) return null;
-      const ONBOARD=['📋 שלח לינק אישי לרכז','📱 הוסף לקבוצת וואטסאפ של הרכזים','⏰ הגדר שעת חלוקה (טאב 📊)','🌐 הגדר לינק קבוצה (טאב 🔗)','🎉 שלח הודעת ברוך הבא לקבוצה שלהם'];
+      const ONBOARD_TASKS=[
+        {id:'ob0', text:'✅ פרסמת את הודעת הפיילוט בקבוצה'},
+        {id:'ob1', text:'🌐 הגדר לינק קבוצת וואטסאפ (טאב 🔗)'},
+        {id:'ob2', text:'📱 שלח לינק האפליקציה לרכז/ת'},
+        {id:'ob3', text:'💡 הסבר לרכז/ת על האפליקציה — איך מזמינים, מה הפרוצס'},
+        {id:'ob4', text:'🎉 שלח הודעת ברוך הבא לקבוצה שלהם'},
+      ];
       return (
         <Card style={{borderRight:"4px solid #7c3aed"}}>
           <p style={{...T.cardTitle,marginBottom:4,color:"#7c3aed"}}>🆕 קליטת רכזים חדשים</p>
           <p style={{fontSize:11,color:"#6b7280",marginBottom:12}}>{newCoords.length} רכזים בשבוע ראשון</p>
-          {newCoords.map(c=>(
-            <div key={c.coordKey} style={{marginBottom:14,borderBottom:"1px solid #ede9fe",paddingBottom:14}}>
-              <div style={{fontWeight:700,fontSize:13,color:"#5b21b6",marginBottom:8}}><CoordName name={c.coordName}/> <span style={{color:"#6b7280",fontWeight:400}}>— {c.city}</span></div>
-              {ONBOARD.map((task,i)=>{
-                const tid=`onboard_${c.coordKey}_${i}`;
-                return <CheckItem key={tid} text={task} done={!!checked[tid]} onToggle={()=>toggle(tid)}/>;
-              })}
-            </div>
-          ))}
+          {newCoords.map(c=>{
+            const pilotMsg=buildPilotMsg(c,'');
+            const appLink=STORE_LINK_DEFAULT;
+            return (
+              <div key={c.coordKey} style={{marginBottom:14,borderBottom:"1px solid #ede9fe",paddingBottom:14}}>
+                <div style={{fontWeight:700,fontSize:13,color:"#5b21b6",marginBottom:10}}><CoordName name={c.coordName}/> <span style={{color:"#6b7280",fontWeight:400}}>— {c.city}</span></div>
+                <div style={{display:"flex",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                  <CopyBtnSimple text={pilotMsg} label="📋 העתק הודעת פרסום לקבוצה"/>
+                  <CopyBtnSimple text={appLink} label="📱 העתק לינק אפליקציה"/>
+                </div>
+                <div style={{fontSize:11,color:"#9ca3af",marginBottom:6}}>סמן לאחר ביצוע:</div>
+                {ONBOARD_TASKS.map(task=>{
+                  const tid=`onboard_${c.coordKey}_${task.id}`;
+                  return <CheckItem key={tid} text={task.text} done={!!checked[tid]} onToggle={()=>toggle(tid)}/>;
+                })}
+              </div>
+            );
+          })}
         </Card>
       );
     })()}
@@ -925,7 +939,7 @@ function Confetti({colors}) {
 
 // COORDINATOR SCREEN — same as v5
 // ══════════════════════════════════════════════
-function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast,showToast,updatedAt,history,memberEntry,rank,totalCoords}) {
+function CoordScreen({coord,driver,waGroupLink,week,onBack,tab,setTab,toast,showToast,updatedAt,history,memberEntry,rank,totalCoords}) {
   if(!coord) return null;
   const totalRev=coord.orders.reduce((s,o)=>s+o.total,0);
   const orderCount=coord.orders.length;
@@ -1110,8 +1124,8 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
         ))}
       </div>
       <Body>
-        {tab==="orders"    && <OrdersTab coord={coord} time={time} showToast={showToast}/>}
-        {tab==="messages"  && <MessagesTab coord={coord} time={time} week={week} pilot={pilot} driver={driver} waGroupLink={waGroupLink} justGraduated={justGraduated} pilotPassed={pilotPassed} beatLastWeek={beatLastWeek} beatOrders={beatOrders} beatRevenue={beatRevenue} lastWeek={lastWeek} orderCount={orderCount} totalRev={totalRev} hitMemberTarget={hitMemberTarget} memberEntry={memberEntry} showToast={showToast}/>}
+        {tab==="orders"    && <OrdersTab coord={coord} showToast={showToast}/>}
+        {tab==="messages"  && <MessagesTab coord={coord} week={week} pilot={pilot} driver={driver} waGroupLink={waGroupLink} justGraduated={justGraduated} pilotPassed={pilotPassed} beatLastWeek={beatLastWeek} beatOrders={beatOrders} beatRevenue={beatRevenue} lastWeek={lastWeek} orderCount={orderCount} totalRev={totalRev} hitMemberTarget={hitMemberTarget} memberEntry={memberEntry} showToast={showToast}/>}
         {tab==="reminders" && <RemindersTab coord={coord} pilot={pilot} activeReminders={activeReminders} waGroupLink={waGroupLink} history={history} showToast={showToast}/>}
         {tab==="faq"       && <FaqTab/>}
       </Body>
@@ -1120,13 +1134,13 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
   );
 }
 
-function OrdersTab({coord,time,showToast}) {
+function OrdersTab({coord,showToast}) {
   const [copied,setCopied]=useState(false);
   const [expanded,setExpanded]=useState(null);
   const newCount=coord.orders.filter(o=>o.returning===false).length;
   const retCount=coord.orders.length-newCount;
   function copyList(){
-    const lines=[`שלום חברים! 😊`,`הנה רשימת המזמינים לחלוקה היום בשעה ${time}:`,"",...coord.orders.map((o,i)=>`${i+1}. ${o.name}${o.phone?" — "+fmtPhone(o.phone):""}`),"",`סה"כ ${coord.orders.length} מזמינים. מחכים לכם! 🌿`];
+    const lines=[`שלום חברים! 😊`,`הנה רשימת המזמינים לחלוקה:`,"",...coord.orders.map((o,i)=>`${i+1}. ${o.name}${o.phone?" — "+fmtPhone(o.phone):""}`),"",`סה"כ ${coord.orders.length} מזמינים. מחכים לכם! 🌿`];
     navigator.clipboard.writeText(lines.join("\n")).then(()=>{setCopied(true);showToast("✅ הועתק");setTimeout(()=>setCopied(false),3500);});
   }
   return (
@@ -1177,12 +1191,12 @@ function OrdersTab({coord,time,showToast}) {
   );
 }
 
-function MessagesTab({coord,time,week,pilot,driver,waGroupLink,justGraduated,pilotPassed,beatLastWeek,beatOrders,beatRevenue,lastWeek,orderCount,totalRev,hitMemberTarget,memberEntry,showToast}) {
+function MessagesTab({coord,week,pilot,driver,waGroupLink,justGraduated,pilotPassed,beatLastWeek,beatOrders,beatRevenue,lastWeek,orderCount,totalRev,hitMemberTarget,memberEntry,showToast}) {
   const storeLink=getStoreLink();
   const weekLabel = pilot?.status==="pilot" ? `פיילוט שבוע ${pilot.week}/4` : `שבוע ${week?.num||1}`;
   const msgs=[
-    {title:"🔔 פתיחת חנות",      sub:"לפרסום בקבוצה",              color:"#1a3c2e", text:buildStoreOpen(coord,time,weekLabel)},
-    {title:"🌿 הודעה שבועית",    sub:"שיווק + לינק + קריאה לשתף", color:"#2d6a4f", text:buildGroupAnnounce(coord,time,weekLabel)},
+    {title:"🔔 פתיחת חנות",      sub:"לפרסום בקבוצה",              color:"#1a3c2e", text:buildStoreOpen(coord,null,weekLabel)},
+    {title:"🌿 הודעה שבועית",    sub:"שיווק + לינק + קריאה לשתף", color:"#2d6a4f", text:buildGroupAnnounce(coord,null,weekLabel)},
     {title:"🔗 לינק החנות",      sub:"להעתקה ושיתוף",              color:"#52b788", text:storeLink},
     {title:"💬 שירות לקוחות",   sub:"התכתבות WA בלבד",            color:"#f4a261", text:`שירות לקוחות פופ ישראל 💬\n${fmtPhone(CS_PHONE)}\n\n⚠️ בהתכתבות בוואטסאפ בלבד (לא שיחות)`},
     {title:"📋 רווית — לוגיסטיקה", sub:"נהג / עיכוב / תיאום",    color:"#e67e22", text:`רווית — מתאמת לוגיסטיקה 🚐\n${fmtPhone(RAVIT_PHONE)}\n\nפונים לרווית רק בנושאים:\n• בעיה עם הנהג\n• עיכוב בחלוקה\n• תיאום מיוחד\n\nבעיות הזמנה ותשלום → שירות לקוחות בלבד.`},
