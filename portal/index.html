@@ -106,6 +106,7 @@ const K_HISTORY    = "pop_v6_history";
 const K_MEMBERS    = "pop_v6_members";
 const K_DELIV_DAYS = "pop_v6_delivdays";
 const K_GRP_NAMES  = "pop_v6_grpnames";
+const K_PHONES     = "pop_v6_phones";
 
 // ══════════════════════════════════════════════
 // HELPERS
@@ -304,6 +305,7 @@ function App() {
   const [memberData,    setMemberData]    = useState({});
   const [deliveryDays,  setDeliveryDays]  = useState({});
   const [groupNames,    setGroupNames]    = useState({});
+  const [coordPhones,   setCoordPhones]   = useState({});
   const [adminTab,      setAdminTab]      = useState("overview");
   const [selCoord,  setSelCoord] = useState(null);
   const [tab,       setTab]      = useState("orders");
@@ -338,6 +340,7 @@ function App() {
     const md = sto_get(K_MEMBERS);   if(md) setMemberData(md);
     const dd = sto_get(K_DELIV_DAYS);if(dd) setDeliveryDays(dd);
     const gn = sto_get(K_GRP_NAMES); if(gn) setGroupNames(gn);
+    const ph = sto_get(K_PHONES);    if(ph) setCoordPhones(ph);
 
     // Fetch server settings (secretary writes here, all portals read)
     try {
@@ -351,6 +354,7 @@ function App() {
       if (sv.memberData)    { setMemberData(sv.memberData);       sto_set(K_MEMBERS,    sv.memberData);     }
       if (sv.deliveryDays)  { setDeliveryDays(sv.deliveryDays);   sto_set(K_DELIV_DAYS, sv.deliveryDays);  }
       if (sv.groupNames)    { setGroupNames(sv.groupNames);        sto_set(K_GRP_NAMES,  sv.groupNames);    }
+      if (sv.coordPhones)   { setCoordPhones(sv.coordPhones);     sto_set(K_PHONES,     sv.coordPhones);   }
     } catch(e) {}
 
     try {
@@ -360,7 +364,16 @@ function App() {
         const orderCoords = data.coords || [];
         const sheetCoords = data.coordinators || [];
         const merged = mergeCoordsWithList(orderCoords, sheetCoords);
-        setCoords(merged);
+        // accumulate phones: any coord that has a phone this week → save for future weeks
+        const savedPh = sto_get(K_PHONES) || {};
+        const updatedPh = {...savedPh};
+        merged.forEach(c => { if(c.coordPhone) updatedPh[c.coordKey] = c.coordPhone; });
+        setCoordPhones(updatedPh);
+        sto_set(K_PHONES, updatedPh);
+        postSettings({coordPhones: updatedPh}).catch(()=>{});
+        // enrich coords with stored phones as fallback
+        const enriched = merged.map(c => ({...c, coordPhone: c.coordPhone || updatedPh[c.coordKey] || ''}));
+        setCoords(enriched);
         setUpdatedAt(data.updatedAt);
         if (cp) {
           let found = matchCoord(orderCoords, cp);
