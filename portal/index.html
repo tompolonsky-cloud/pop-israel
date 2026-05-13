@@ -478,12 +478,11 @@ function getCoordStatus(coord) {
   const revenue = coord.orders.reduce((s,o) => s+o.total, 0);
   if (p.status === 'regular') {
     if (revenue < 1000) return 'red';
-    if (revenue < 1300) return 'yellow';
+    if (revenue < 2500) return 'yellow';
     return 'green';
   }
-  if (orders < 5)  return 'red';
-  if (orders < 8)  return 'yellow';
-  return 'green';
+  // פיילוט: רק אדום/ירוק
+  return orders < 5 ? 'red' : 'green';
 }
 const STATUS_SORT   = { red:0, yellow:1, green:2 };
 const STATUS_EMOJI  = { red:'🔴', yellow:'🟡', green:'🟢' };
