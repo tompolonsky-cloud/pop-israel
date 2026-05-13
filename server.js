@@ -159,11 +159,14 @@ function parseItems(str) {
 }
 
 function parseDelivery(str) {
-  const pm = str.match(/0\d[\-\s]?\d{3}[\-\s]?\d{4}/);
+  // match 10-digit Israeli mobile (with or without dashes/spaces)
+  const pm = str.match(/0\d{9}|0\d[\-\s]?\d{3}[\-\s]?\d{4}/);
   const cp = pm ? pm[0] : '';
   let city = '', rest = str;
-  const di = str.indexOf(' - ');
-  if (di > 0) { city = str.slice(0, di).trim(); rest = str.slice(di + 3).trim(); }
+  // handle both "עיר - שם" and "עיר- שם" separators
+  const sepM = str.match(/ ?- /);
+  const di = sepM ? str.indexOf(sepM[0]) : -1;
+  if (di > 0) { city = str.slice(0, di).trim(); rest = str.slice(di + sepM[0].length).trim(); }
   let cn = rest;
   if (cp) cn = rest.replace(cp, '').trim();
   cn = cn.split(',').pop().trim().replace(/\s+\d.*$/, '').trim();
@@ -215,6 +218,6 @@ function parseCSV(text) {
 
   return Object.entries(byD).map(([key, orders]) => {
     const p = parseDelivery(key);
-    return { ...p, coordKey: slugify(p.coordName || key), deliveryStr: key, orders };
+    return { ...p, coordKey: slugify(p.coordName || p.city || key), deliveryStr: key, orders };
   });
 }
