@@ -416,6 +416,20 @@ function App() {
       onOpenCoord={c=>{setSelCoord(c);setTab("orders");setView("coord");}}
       onUpdateMembers={updateMembers} toast={toast} showToast={showToast}/>;
 
+  const coordRank = (() => {
+    if (!selCoord || !coords.length) return null;
+    const myPilot = pilotInfo(selCoord.launchDate);
+    const myVal = myPilot.status==='regular'
+      ? selCoord.orders.reduce((s,o)=>s+o.total,0)
+      : selCoord.orders.length;
+    const better = coords.filter(c=>{
+      const p=pilotInfo(c.launchDate);
+      const v=p.status==='regular'?c.orders.reduce((s,o)=>s+o.total,0):c.orders.length;
+      return v>myVal;
+    }).length;
+    return {rank:better+1, total:coords.length};
+  })();
+
   if(view==="coord") return <CoordScreen coord={selCoord}
       time={times[selCoord?.coordKey]||"17:00"}
       driver={drivers[selCoord?.coordKey]||null}
@@ -423,6 +437,7 @@ function App() {
       week={week} onBack={coordParam?null:()=>setView("admin")}
       updatedAt={updatedAt} history={coordHistory[selCoord?.coordKey]||[]}
       memberEntry={memberData[selCoord?.coordKey]||null}
+      rank={coordRank?.rank} totalCoords={coordRank?.total}
       tab={tab} setTab={setTab} toast={toast} showToast={showToast}/>;
 
   return null;
@@ -497,7 +512,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
       </div>
 
       <Body>
-        {adTab==="checklist" && <ChecklistTab staleCoords={staleCoords} showToast={showToast}/>}
+        {adTab==="checklist" && <ChecklistTab staleCoords={staleCoords} coords={coords} showToast={showToast}/>}
 
         {adTab==="overview" && <>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
@@ -537,6 +552,22 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
               );
             })}
           </Card>
+
+          {(()=>{
+            const reds=sortedCoords.filter(c=>getCoordStatus(c)==='red');
+            if(!reds.length) return null;
+            const redMsg=`⚠️ רכזים שצריכים עזרה השבוע:\n`+reds.map(c=>`• ${c.coordName} (${c.city||''}) — ${c.orders.length} הזמנות`).join('\n');
+            return <CopyBtnSimple text={redMsg} label={`📋 העתק ${reds.length} רכזים ב🔴`}/>;
+          })()}
+          {(()=>{
+            const greens=coords.filter(c=>getCoordStatus(c)==='green').length;
+            const yellows=coords.filter(c=>getCoordStatus(c)==='yellow').length;
+            const reds2=coords.filter(c=>getCoordStatus(c)==='red').length;
+            const top=[...coords].sort((a,b)=>b.orders.reduce((s,o)=>s+o.total,0)-a.orders.reduce((s,o)=>s+o.total,0))[0];
+            const topRev=top?top.orders.reduce((s,o)=>s+o.total,0):0;
+            const sumMsg=`📊 סיכום שבוע ${week?.num||''} — פופ ישראל 🌿\n${coords.length} רכזים פעילים | ${totalOrders} הזמנות | ₪${totalRev.toLocaleString('he-IL')} סה"כ\n🟢 ${greens} ירוקים · 🟡 ${yellows} צהובים · 🔴 ${reds2} אדומים\n🏆 מוביל: ${top?.coordName||''} — ${top?.orders.length||0} הזמנות · ₪${topRev.toLocaleString('he-IL')}`;
+            return <CopyBtnSimple text={sumMsg} label="📝 העתק סיכום שבועי"/>;
+          })()}
 
         </>}
 
@@ -655,7 +686,7 @@ function CheckItem({text,done,onToggle}){
   );
 }
 
-function ChecklistTab({staleCoords}){
+function ChecklistTab({staleCoords,coords}){
   const todayKey = new Date().toDateString();
   const [checked,setChecked]=useState(()=>sto_get("pop_checklist_"+todayKey)||{});
   function toggle(id){const n={...checked,[id]:!checked[id]};setChecked(n);sto_set("pop_checklist_"+todayKey,n);}
@@ -714,7 +745,61 @@ function ChecklistTab({staleCoords}){
         ))}
       </Card>
     )}
+    {(()=>{
+      const newCoords=(coords||[]).filter(c=>{const p=pilotInfo(c.launchDate);return p.status==='pilot'&&p.week===1;});
+      if(!newCoords.length) return null;
+      const ONBOARD=['📋 שלח לינק אישי לרכז','📱 הוסף לקבוצת וואטסאפ של הרכזים','⏰ הגדר שעת חלוקה (טאב 📊)','💬 הגדר לינק קבוצה (טאב 💬)','🎉 שלח הודעת ברוך הבא לקבוצה שלהם'];
+      return (
+        <Card style={{borderRight:"4px solid #7c3aed"}}>
+          <p style={{...T.cardTitle,marginBottom:4,color:"#7c3aed"}}>🆕 קליטת רכזים חדשים</p>
+          <p style={{fontSize:11,color:"#6b7280",marginBottom:12}}>{newCoords.length} רכזים בשבוע ראשון</p>
+          {newCoords.map(c=>(
+            <div key={c.coordKey} style={{marginBottom:14,borderBottom:"1px solid #ede9fe",paddingBottom:14}}>
+              <div style={{fontWeight:700,fontSize:13,color:"#5b21b6",marginBottom:8}}><CoordName name={c.coordName}/> <span style={{color:"#6b7280",fontWeight:400}}>— {c.city}</span></div>
+              {ONBOARD.map((task,i)=>{
+                const tid=`onboard_${c.coordKey}_${i}`;
+                return <CheckItem key={tid} text={task} done={!!checked[tid]} onToggle={()=>toggle(tid)}/>;
+              })}
+            </div>
+          ))}
+        </Card>
+      );
+    })()}
   </>;
+}
+
+// ══════════════════════════════════════════════
+// SPARKLINE
+// ══════════════════════════════════════════════
+function Sparkline({history, isRegular}) {
+  if (!history || history.length < 2) return null;
+  const data = history.slice(-6);
+  const vals = data.map(d => isRegular ? (d.revenue||0) : (d.orders||0));
+  const max = Math.max(...vals, 1);
+  const W = 100, H = 28;
+  const pts = vals.map((v,i)=>`${(i/(vals.length-1))*W},${H-(v/max)*H}`).join(' ');
+  const last = vals[vals.length-1];
+  const prev = vals[vals.length-2];
+  const up = last > prev, dn = last < prev;
+  const tc = up ? '#86efac' : dn ? '#fca5a5' : '#ffd166';
+  const arrow = up ? '↑' : dn ? '↓' : '→';
+  return (
+    <div style={{marginTop:14}}>
+      <div style={{display:'flex',justifyContent:'space-between',fontSize:10,opacity:.75,marginBottom:5}}>
+        <span>📊 {data.length} שבועות אחרונים</span>
+        <span style={{color:tc,fontWeight:700}}>{arrow} {isRegular?`₪${last.toLocaleString('he-IL')}`:`${last} הז׳`}</span>
+      </div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{overflow:'visible',display:'block'}}>
+        <polyline points={pts} fill="none" stroke="rgba(255,255,255,.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        {vals.map((v,i)=>(
+          <circle key={i}
+            cx={(i/(vals.length-1))*W} cy={H-(v/max)*H}
+            r={i===vals.length-1?3:2}
+            fill={i===vals.length-1?tc:"rgba(255,255,255,.45)"}/>
+        ))}
+      </svg>
+    </div>
+  );
 }
 
 // ══════════════════════════════════════════════
@@ -747,7 +832,7 @@ function Confetti({colors}) {
 
 // COORDINATOR SCREEN — same as v5
 // ══════════════════════════════════════════════
-function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast,showToast,updatedAt,history,memberEntry}) {
+function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast,showToast,updatedAt,history,memberEntry,rank,totalCoords}) {
   if(!coord) return null;
   const totalRev=coord.orders.reduce((s,o)=>s+o.total,0);
   const orderCount=coord.orders.length;
@@ -860,6 +945,16 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
             <div style={{width:Math.min(100,((memberEntry?.count||0)/GROUP_TARGET)*100)+"%",height:"100%",background:"#ffd166",borderRadius:99,transition:"width .5s"}}/>
           </div>
         </div>
+        <Sparkline history={history} isRegular={isRegular}/>
+        {rank&&totalCoords&&(
+          <div style={{marginTop:10,display:'flex',alignItems:'center',gap:6}}>
+            <div style={{flex:1,height:1,background:'rgba(255,255,255,.15)'}}/>
+            <div style={{fontSize:11,opacity:.8,fontWeight:700,color: rank<=3?'#ffd166':'rgba(255,255,255,.7)'}}>
+              {rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':'📍'} מקום {rank} מתוך {totalCoords} רכזים
+            </div>
+            <div style={{flex:1,height:1,background:'rgba(255,255,255,.15)'}}/>
+          </div>
+        )}
         <div style={{marginTop:12}}>
           {isRegular ? (<>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:4}}>
@@ -922,13 +1017,23 @@ function CoordScreen({coord,time,driver,waGroupLink,week,onBack,tab,setTab,toast
 function OrdersTab({coord,time,showToast}) {
   const [copied,setCopied]=useState(false);
   const [expanded,setExpanded]=useState(null);
+  const newCount=coord.orders.filter(o=>o.returning===false).length;
+  const retCount=coord.orders.length-newCount;
   function copyList(){
     const lines=[`שלום חברים! 😊`,`הנה רשימת המזמינים לחלוקה היום בשעה ${time}:`,"",...coord.orders.map((o,i)=>`${i+1}. ${o.name}${o.phone?" — "+fmtPhone(o.phone):""}`),"",`סה"כ ${coord.orders.length} מזמינים. מחכים לכם! 🌿`];
     navigator.clipboard.writeText(lines.join("\n")).then(()=>{setCopied(true);showToast("✅ הועתק");setTimeout(()=>setCopied(false),3500);});
   }
   return (
     <Card>
-      <p style={{...T.cardTitle,marginBottom:14}}>📋 רשימת מזמינים</p>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+        <p style={T.cardTitle}>📋 רשימת מזמינים</p>
+        {coord.orders.length>0&&(
+          <div style={{display:'flex',gap:6,fontSize:11,fontWeight:700}}>
+            {newCount>0&&<span style={{background:'#dbeafe',color:'#1d4ed8',padding:'2px 8px',borderRadius:99}}>🆕 {newCount} חדשים</span>}
+            {retCount>0&&<span style={{background:'#dcfce7',color:'#166534',padding:'2px 8px',borderRadius:99}}>🔄 {retCount} חוזרים</span>}
+          </div>
+        )}
+      </div>
       {coord.orders.map((o,i)=>(
         <div key={i} style={{borderBottom:i<coord.orders.length-1?"1px solid #e8ede9":"none"}}>
           <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",cursor:o.items?.length?"pointer":"default"}}
