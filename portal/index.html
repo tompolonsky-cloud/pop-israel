@@ -719,52 +719,56 @@ function CheckItem({text,done,onToggle}){
 }
 
 function ChecklistTab({staleCoords,coords}){
-  const todayKey = new Date().toDateString();
-  const [checked,setChecked]=useState(()=>sto_get("pop_checklist_"+todayKey)||{});
-  function toggle(id){const n={...checked,[id]:!checked[id]};setChecked(n);sto_set("pop_checklist_"+todayKey,n);}
+  // weekly key — resets each Sunday
+  const _d=new Date(), _sun=new Date(_d); _sun.setDate(_d.getDate()-_d.getDay());
+  const weekKey="pop_checklist_w_"+_sun.toDateString();
+  const [checked,setChecked]=useState(()=>sto_get(weekKey)||{});
+  function toggle(id){const n={...checked,[id]:!checked[id]};setChecked(n);sto_set(weekKey,n);}
 
-  const day=new Date().getDay();
-  const DAY_NAMES=["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
-  const DAILY={
-    0:[
+  const today=new Date().getDay();
+
+  const DAYS=[
+    {n:0, label:"ראשון", tasks:[
       {id:"s1",text:"📢 שלח הודעת פתיחת חנות לכל הרכזים — החנות נפתחת ב-19:00"},
       {id:"s2",text:"🤖 שלח אוטומציה למזמינים שהזמינו בפעם הראשונה השבוע"},
       {id:"s3",text:"🆕 שלח ברוך הבא למזמינים חדשים משבוע שעבר"},
-    ],
-    1:[
+    ]},
+    {n:1, label:"שני", tasks:[
       {id:"m1",text:"🧺 הזמן סל רכזים לשבוע הבא (לפני 14:00!)"},
       {id:"m2",text:"💬 המשך להגיב למי שהגיב לאוטומציה — הנע לרכישה ולשיתוף חברים"},
-    ],
-    2:[{id:"t1",text:"📊 בדוק סטטוס הזמנות — מי ב🔴 ומי צריך עזרה?"}],
-    3:[{id:"w1",text:"🔔 שלח תזכורת לרכזים — מחר יום אחרון להזמנות!"}],
-    4:[
+    ]},
+    {n:2, label:"שלישי", tasks:[
+      {id:"t1",text:"📊 בדוק סטטוס הזמנות — מי ב🔴 ומי צריך עזרה?"},
+    ]},
+    {n:3, label:"רביעי", tasks:[
+      {id:"w1",text:"🔔 שלח תזכורת לרכזים — מחר יום אחרון להזמנות!"},
+    ]},
+    {n:4, label:"חמישי", tasks:[
       {id:"h1",text:"⏰ שלח תזכורת אחרונה לפני סגירת ההזמנות ב-8:00"},
-      {id:"h2",text:"🚐 תאם עם נהגים — עדכן מספרי נהגים בטאב 🚐"},
-      {id:"h3",text:"👥 עדכן חברי קבוצות וואטסאפ — מספר חברים + תאריך הצטרפות (טאב 👥)"},
-    ],
-    5:[
-      {id:"f1",text:"📋 שלח רשימות מזמינים לכל רכז"},
-      {id:"f2",text:"📦 וודא שהחלוקה מתואמת לכולם"},
-    ],
-    6:[],
-  };
-  const weekly=[
-    {id:"w_stat",text:"📊 בדוק סטטוס רכזים — מי ב🔴 ומי צריך עזרה"},
+      {id:"h2",text:"🚐 מלא נהגים לכל הרכזים (טאב 🚐)"},
+      {id:"h3",text:"👥 עדכן מספר משתתפים + מצטרף אחרון בכל קבוצת וואטסאפ (טאב 👥)"},
+    ]},
   ];
-  const todayTasks=DAILY[day]||[];
 
   return <>
-    <Card>
-      <p style={{...T.cardTitle,marginBottom:12}}>📅 היום — {DAY_NAMES[day]}</p>
-      {todayTasks.length===0
-        ?<p style={{fontSize:13,color:"#6b7280",padding:"8px 0"}}>אין משימות ייחודיות להיום ✓</p>
-        :todayTasks.map(t=><CheckItem key={t.id} text={t.text} done={!!checked[t.id]} onToggle={()=>toggle(t.id)}/>)
-      }
-    </Card>
-    <Card>
-      <p style={{...T.cardTitle,marginBottom:12}}>🔁 שבועי</p>
-      {weekly.map(t=><CheckItem key={t.id} text={t.text} done={!!checked[t.id]} onToggle={()=>toggle(t.id)}/>)}
-    </Card>
+    {DAYS.map(({n,label,tasks})=>{
+      const isToday=today===n;
+      const doneCount=tasks.filter(t=>!!checked[t.id]).length;
+      const allDone=doneCount===tasks.length;
+      return (
+        <Card key={n} style={isToday?{borderRight:"4px solid #2d6a4f",background:"#f0fdf4"}:allDone?{opacity:.65}:{}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+            <p style={{...T.cardTitle,color:isToday?"#166534":"#374151"}}>
+              {isToday?"📍 ":""}יום {label}
+            </p>
+            <span style={{fontSize:11,fontWeight:700,color:allDone?"#16a34a":"#9ca3af"}}>
+              {allDone?"✓ הכל בוצע":`${doneCount}/${tasks.length}`}
+            </span>
+          </div>
+          {tasks.map(t=><CheckItem key={t.id} text={t.text} done={!!checked[t.id]} onToggle={()=>toggle(t.id)}/>)}
+        </Card>
+      );
+    })}
     {staleCoords.length>0&&(
       <Card style={{borderRight:"4px solid #f59e0b"}}>
         <p style={{...T.cardTitle,marginBottom:10,color:"#b45309"}}>⚠️ לא עודכן — חברי קבוצה</p>
@@ -780,7 +784,7 @@ function ChecklistTab({staleCoords,coords}){
     {(()=>{
       const newCoords=(coords||[]).filter(c=>{const p=pilotInfo(c.launchDate);return p.status==='pilot'&&p.week===1;});
       if(!newCoords.length) return null;
-      const ONBOARD=['📋 שלח לינק אישי לרכז','📱 הוסף לקבוצת וואטסאפ של הרכזים','⏰ הגדר שעת חלוקה (טאב 📊)','💬 הגדר לינק קבוצה (טאב 💬)','🎉 שלח הודעת ברוך הבא לקבוצה שלהם'];
+      const ONBOARD=['📋 שלח לינק אישי לרכז','📱 הוסף לקבוצת וואטסאפ של הרכזים','⏰ הגדר שעת חלוקה (טאב 📊)','🌐 הגדר לינק קבוצה (טאב 🔗)','🎉 שלח הודעת ברוך הבא לקבוצה שלהם'];
       return (
         <Card style={{borderRight:"4px solid #7c3aed"}}>
           <p style={{...T.cardTitle,marginBottom:4,color:"#7c3aed"}}>🆕 קליטת רכזים חדשים</p>
