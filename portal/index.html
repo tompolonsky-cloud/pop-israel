@@ -652,12 +652,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
                   <span style={{fontSize:15}}>{STATUS_EMOJI[st]}</span>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:700,display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
-                      {c.coordPhone
-                        ?<a href={waLink(c.coordPhone)} target="_blank" rel="noopener noreferrer"
-                            onClick={e=>e.stopPropagation()} style={{color:'inherit',textDecoration:'none'}}>
-                            <CoordName name={c.coordName}/>
-                          </a>
-                        :<CoordName name={c.coordName}/>}
+                      <CoordName name={c.coordName}/>
                       {selfOrdered(c)&&<span style={{fontSize:10,background:'#dbeafe',color:'#1d4ed8',borderRadius:4,padding:'1px 5px'}}>🛒</span>}
                       {day&&<span style={{fontSize:10,fontWeight:700,background:'#fef3c7',color:'#92400e',borderRadius:4,padding:'1px 6px'}}>יום {day}</span>}
                     </div>
@@ -674,6 +669,8 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
                     <div style={{fontSize:13,fontWeight:900,color:'#1a3c2e'}}>{c.orders.length} הז׳</div>
                     <div style={{fontSize:12,color:'#5a7a64',fontWeight:600}}>₪{rev.toLocaleString('he-IL')}</div>
                   </div>
+                  {c.coordPhone&&<button onClick={e=>{e.stopPropagation();window.open(waLink(c.coordPhone));}}
+                    style={{...S.iconBtn,background:'#dcfce7',flexShrink:0}}>💬</button>}
                   <button onClick={e=>{e.stopPropagation();onFireNotif(c);}}
                     style={{...S.iconBtn,background:'#1a3c2e',color:'#ffd166',flexShrink:0}}>🔔</button>
                 </div>
