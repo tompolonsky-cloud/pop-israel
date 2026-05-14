@@ -866,6 +866,48 @@ function ChecklistTab({staleCoords,coords}){
   const [checked,setChecked]=useState(()=>sto_get(weekKey)||{});
   function toggle(id){const n={...checked,[id]:!checked[id]};setChecked(n);sto_set(weekKey,n);}
   const [weekSummary,setWeekSummary]=useState('');
+  const [weekMeetingsLoading,setWeekMeetingsLoading]=useState(false);
+  const [monthlyCount,setMonthlyCount]=useState(null); // null=loading
+  const [daySummaries,setDaySummaries]=useState(()=>{
+    // load saved summaries for this week's actual dates
+    const out={};
+    for(let n=0;n<=4;n++){
+      const d=new Date(_sun.getTime()+n*86400000);
+      const k='pop_daysum_'+d.toISOString().slice(0,10);
+      const v=localStorage.getItem(k);
+      if(v) out[n]=v;
+    }
+    return out;
+  });
+  const [openDaySummary,setOpenDaySummary]=useState(null);
+  const [daySummaryDraft,setDaySummaryDraft]=useState('');
+
+  useEffect(()=>{
+    fetch('/api/meetings?period=month')
+      .then(r=>r.json()).then(d=>setMonthlyCount(d.total??0)).catch(()=>setMonthlyCount(-1));
+  },[]);
+
+  function saveDaySummary(dayN){
+    const d=new Date(_sun.getTime()+dayN*86400000);
+    const k='pop_daysum_'+d.toISOString().slice(0,10);
+    localStorage.setItem(k, daySummaryDraft);
+    setDaySummaries(prev=>({...prev,[dayN]:daySummaryDraft}));
+    setOpenDaySummary(null);
+  }
+
+  async function loadWeekMeetings(){
+    setWeekMeetingsLoading(true);
+    try{
+      const r=await fetch('/api/meetings?period=week');
+      const d=await r.json();
+      const msgs=(d.meetings||[]).map(m=>`• ${m.name}${m.resolution?' — '+m.resolution:''}`);
+      const sunD=new Date(_sun), satD=new Date(_sun.getTime()+6*86400000);
+      const fmt=x=>`${x.getDate()}/${x.getMonth()+1}`;
+      const header=`סיכום פגישות השבוע (${fmt(sunD)}–${fmt(satD)}):\n`;
+      setWeekSummary(msgs.length ? header+msgs.join('\n')+`\n\nסה"כ ${msgs.length} פגישות 📋` : 'לא נמצאו פגישות השבוע');
+    }catch(e){setWeekSummary('שגיאה בטעינת הנתונים');}
+    setWeekMeetingsLoading(false);
+  }
 
   const today=new Date().getDay();
 
@@ -901,40 +943,80 @@ function ChecklistTab({staleCoords,coords}){
   ];
 
   return <>
+    {/* ── ספירת פגישות חודשית ── */}
+    <Card style={{background:'#1a3c2e',color:'#fff',padding:'14px 16px'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div>
+          <div style={{fontSize:11,opacity:.7,marginBottom:3}}>📊 פגישות שהתקיימו החודש</div>
+          <div style={{fontSize:28,fontWeight:900,lineHeight:1}}>
+            {monthlyCount===null ? '…' : monthlyCount<0 ? '—' : monthlyCount}
+          </div>
+        </div>
+        <div style={{fontSize:40,opacity:.25}}>📅</div>
+      </div>
+      {monthlyCount>0&&<div style={{fontSize:11,opacity:.6,marginTop:6}}>מתאפס אוטומטית בתחילת כל חודש</div>}
+    </Card>
+
     {DAYS.map(({n,label,tasks})=>{
       const isToday=today===n;
       const doneCount=tasks.filter(t=>!!checked[t.id]).length;
       const allDone=doneCount===tasks.length;
+      const hasSummary=!!daySummaries[n];
       return (
-        <Card key={n} style={isToday?{borderRight:"4px solid #2d6a4f",background:"#f0fdf4"}:allDone?{opacity:.65}:{}}>
+        <Card key={n} style={isToday?{borderRight:"4px solid #2d6a4f",background:"#f0fdf4"}:allDone&&hasSummary?{opacity:.65}:{}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
             <p style={{...T.cardTitle,color:isToday?"#166534":"#374151"}}>
               {isToday?"📍 ":""}יום {label}
             </p>
-            <span style={{fontSize:11,fontWeight:700,color:allDone?"#16a34a":"#9ca3af"}}>
-              {allDone?"✓ הכל בוצע":`${doneCount}/${tasks.length}`}
-            </span>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              {hasSummary&&<span style={{fontSize:11,color:'#16a34a',fontWeight:700}}>📝✓</span>}
+              <span style={{fontSize:11,fontWeight:700,color:allDone?"#16a34a":"#9ca3af"}}>
+                {allDone?"✓ הכל בוצע":`${doneCount}/${tasks.length}`}
+              </span>
+            </div>
           </div>
           {tasks.map(t=><CheckItem key={t.id} text={t.text} done={!!checked[t.id]} onToggle={()=>toggle(t.id)}/>)}
+          {/* כפתור סיכום יום */}
+          <div style={{marginTop:10,borderTop:'1px solid #e8ede9',paddingTop:10}}>
+            <button onClick={()=>{
+              if(openDaySummary===n){setOpenDaySummary(null);}
+              else{setDaySummaryDraft(daySummaries[n]||'');setOpenDaySummary(n);}
+            }} style={{width:'100%',background:hasSummary?'#dcfce7':'#f3f4f6',border:'none',borderRadius:8,padding:'8px 12px',fontSize:12,fontWeight:700,color:hasSummary?'#166534':'#6b7280',cursor:'pointer',textAlign:'right'}}>
+              {hasSummary?'📝 סיכום יום נשמר — לחץ לעריכה':'📝 כתוב סיכום יום'}
+            </button>
+            {openDaySummary===n&&(
+              <div style={{marginTop:8}}>
+                <textarea
+                  value={daySummaryDraft} onChange={e=>setDaySummaryDraft(e.target.value)}
+                  placeholder="מה עשית היום? עם מי דיברת? מה היו הרזולוציות?"
+                  style={{width:'100%',boxSizing:'border-box',minHeight:90,borderRadius:8,border:'1px solid #bbf7d0',padding:'9px',fontSize:12,lineHeight:1.6,resize:'vertical',fontFamily:'inherit',outline:'none'}}
+                />
+                <button onClick={()=>saveDaySummary(n)}
+                  style={{...S.btn,marginTop:6,background:'#2d6a4f',width:'100%'}}>💾 שמור סיכום</button>
+              </div>
+            )}
+          </div>
           {n===4&&(
             <div style={{marginTop:12,background:'#f0fdf4',borderRadius:10,padding:'12px'}}>
-              <div style={{fontSize:12,fontWeight:700,color:'#166534',marginBottom:6}}>📝 סיכום פגישות לשליחה לתום</div>
+              <div style={{fontSize:12,fontWeight:700,color:'#166534',marginBottom:8}}>📋 סיכום פגישות לשליחה לתום</div>
+              <button onClick={loadWeekMeetings} disabled={weekMeetingsLoading}
+                style={{...S.btn,background:'#1a3c2e',marginBottom:8,fontSize:12,width:'100%',opacity:weekMeetingsLoading?.7:1}}>
+                {weekMeetingsLoading?'⏳ טוען...':'🔄 טען פגישות השבוע מהגיליון'}
+              </button>
               <textarea
                 value={weekSummary}
                 onChange={e=>setWeekSummary(e.target.value)}
-                placeholder={`לדוגמה:\n• [שם רכז/ת] — קיימנו פגישה, הרזולוציה: ...\n• [שם רכז/ת] — לא ענה, נחזור אליו שבוע הבא\n• [שם רכז/ת] — החליטה להצטרף 🎉`}
+                placeholder="לחץ על הכפתור למעלה לטעינה אוטומטית — או כתוב ידנית"
                 style={{width:'100%',boxSizing:'border-box',minHeight:110,borderRadius:8,border:'1px solid #bbf7d0',padding:'9px',fontSize:12,lineHeight:1.6,resize:'vertical',fontFamily:'inherit',outline:'none',marginBottom:8}}
               />
-              <div style={{display:'flex',gap:8}}>
-                <button onClick={()=>{
-                  if(!weekSummary.trim()){alert('כתבי קודם את הסיכום 😊');return;}
-                  const msg=`שלום תום! 🌿\nסיכום פגישות השבוע:\n\n${weekSummary.trim()}\n\nשבוע טוב 🙏`;
-                  window.open(`https://wa.me/${TOM_PHONE}?text=${encodeURIComponent(msg)}`,'_blank');
-                  toggle('h3');
-                }} style={{...S.btn,flex:1,background:'#25d366',fontSize:13}}>
-                  💬 שלח לתום בוואטסאפ
-                </button>
-              </div>
+              <button onClick={()=>{
+                if(!weekSummary.trim()){alert('כתבי קודם את הסיכום 😊');return;}
+                const msg=`שלום תום! 🌿\n${weekSummary.trim()}\n\nשבוע טוב 🙏`;
+                window.open(`https://wa.me/${TOM_PHONE}?text=${encodeURIComponent(msg)}`,'_blank');
+                toggle('h3');
+              }} style={{...S.btn,background:'#25d366',fontSize:13,width:'100%'}}>
+                💬 שלח לתום בוואטסאפ
+              </button>
             </div>
           )}
         </Card>

@@ -1,6 +1,8 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
+const http  = require('http');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -96,6 +98,92 @@ app.post('/api/coordinators', (req, res) => {
   fs.writeFileSync(COORD_FILE, JSON.stringify(list, null, 2));
   console.log(`📋 רכזים עודכנו — ${list.length} פעילות`);
   res.json({ ok: true, count: list.length });
+});
+
+// ══════════════════════════════════════════════
+// Meetings (CRM sheet) — /api/meetings
+// ══════════════════════════════════════════════
+const LEADS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1aAaW7uSFpIv8I0_4Rt9TsNRnegjYHISJQcMmbP_IGPA/export?format=csv';
+let meetingsCache = null;
+let meetingsCacheTime = 0;
+const MEETINGS_TTL = 30 * 60 * 1000; // 30 min
+
+function fetchURL(url, hops = 6) {
+  return new Promise((resolve, reject) => {
+    const lib = url.startsWith('https') ? https : http;
+    const req = lib.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, res => {
+      if ([301,302,303,307,308].includes(res.statusCode) && res.headers.location && hops > 0)
+        return fetchURL(res.headers.location, hops - 1).then(resolve).catch(reject);
+      let data = '';
+      res.on('data', d => data += d);
+      res.on('end', () => resolve(data));
+    });
+    req.on('error', reject);
+    req.setTimeout(10000, () => { req.destroy(); reject(new Error('timeout')); });
+  });
+}
+
+function parseMeetingDate(str) {
+  if (!str || !str.trim()) return null;
+  const s = str.trim().split(/[\s,]+/)[0];
+  const p = s.split('/');
+  if (p.length !== 3) return null;
+  let [d, m, y] = p.map(Number);
+  if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
+  if (y < 100) y += 2000;
+  return new Date(y, m - 1, d);
+}
+
+function parseMeetingsCSV(text) {
+  const lines = text.split('\n').filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const hdr = parseLine(lines[0], ',').map(h => h.replace(/"/g, '').trim());
+  const iDate     = hdr.findIndex(h => h.includes('תאריך ושעת'));
+  const iHappened = hdr.findIndex(h => h.includes('בוצעה פגישה'));
+  const iRes      = hdr.findIndex(h => h.includes('חוות דעת'));
+  const results = [];
+  for (let i = 1; i < lines.length; i++) {
+    const c = parseLine(lines[i], ',');
+    if (!c || c.length < 2) continue;
+    const happened = iHappened >= 0 ? (c[iHappened] || '').replace(/"/g,'').trim().toUpperCase() : '';
+    if (happened !== 'TRUE') continue;
+    const dateStr = iDate >= 0 ? (c[iDate] || '').replace(/"/g,'').trim() : '';
+    const date = parseMeetingDate(dateStr);
+    const name = (c[0] || '').replace(/"/g,'').trim();
+    const res  = iRes >= 0 ? (c[iRes] || '').replace(/"/g,'').trim() : '';
+    results.push({ name, dateStr, date, resolution: res });
+  }
+  return results;
+}
+
+app.get('/api/meetings', async (req, res) => {
+  try {
+    const now = Date.now();
+    if (!meetingsCache || now - meetingsCacheTime > MEETINGS_TTL) {
+      const csv = await fetchURL(LEADS_SHEET_URL);
+      meetingsCache = parseMeetingsCSV(csv);
+      meetingsCacheTime = now;
+      console.log(`📋 פגישות נטענו — ${meetingsCache.length} עם בוצע=TRUE`);
+    }
+    const period = req.query.period || 'week';
+    const today  = new Date();
+    let filtered;
+    if (period === 'week') {
+      const sun = new Date(today); sun.setDate(today.getDate() - today.getDay()); sun.setHours(0,0,0,0);
+      const sat = new Date(sun);   sat.setDate(sun.getDate() + 6);                sat.setHours(23,59,59,999);
+      filtered = meetingsCache.filter(m => m.date && m.date >= sun && m.date <= sat);
+    } else if (period === 'month') {
+      filtered = meetingsCache.filter(m => m.date &&
+        m.date.getMonth() === today.getMonth() &&
+        m.date.getFullYear() === today.getFullYear());
+    } else {
+      filtered = meetingsCache;
+    }
+    res.json({ meetings: filtered.map(m => ({name:m.name, dateStr:m.dateStr, resolution:m.resolution})), total: filtered.length });
+  } catch(e) {
+    console.error('meetings error:', e.message);
+    res.status(500).json({ error: e.message, meetings: [], total: 0 });
+  }
 });
 
 // ── POST /api/update — refresh.js posts CSV here
