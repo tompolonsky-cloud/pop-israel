@@ -932,24 +932,8 @@ function ChecklistTab({staleCoords,coords}){
   const [weekMeetingsLoading,setWeekMeetingsLoading]=useState(false);
   const [monthlyCount,setMonthlyCount]=useState(null); // null=loading
   const [showAuto,setShowAuto]=useState(false);
-  const [autoSent,setAutoSent]=useState(()=>sto_get('pop_auto_sent_'+_sun.toDateString())||{});
-  const [autoMsg,setAutoMsg]=useState(`שלום {שם}! 🌿\nשמחים שהצטרפת לפופ ישראל השבוע!\nכל שבוע ירקות, פירות ומוצרים טריים ישר מהחקלאי — ללא דמי משלוח, ללא מינימום הזמנה ⚡\nהזמנות נפתחות כל ראשון ב-19:00 ועד חמישי ב-8:00.\nנשמח לראות אותך גם השבוע הבא! 🙏`);
-  function markAutoSent(phone){const n={...autoSent,[phone]:true};setAutoSent(n);sto_set('pop_auto_sent_'+_sun.toDateString(),n);}
-  const autoCustomers=React.useMemo(()=>{
-    const list=[]; const seen=new Set();
-    (coords||[]).forEach(c=>{
-      (c.orders||[]).forEach(o=>{
-        if(o.phone&&!seen.has(o.phone)){
-          seen.add(o.phone);
-          list.push({name:o.name||'לקוח',phone:o.phone,city:c.city||'',coordName:c.coordName||''});
-        }
-      });
-    });
-    return list.sort((a,b)=>a.coordName.localeCompare(b.coordName,'he'));
-  },[coords]);
   const [popNewCustomers, setPopNewCustomers] = useState(null); // null=טרם הועלה
   const [popFileName,    setPopFileName]    = useState('');
-  const [showDirectWA,   setShowDirectWA]   = useState(false);
 
   function parseCSVText(raw){
     const rows=[]; let field='',row=[],inQ=false;
@@ -1192,56 +1176,6 @@ function ChecklistTab({staleCoords,coords}){
                     </div>
                   )}
 
-                  {/* ── שליחה ישירה (גיבוי) ── */}
-                  <div style={{borderTop:'1px dashed #c7d2fe',paddingTop:8}}>
-                    <button onClick={()=>setShowDirectWA(v=>!v)}
-                      style={{width:'100%',background:'transparent',border:'none',fontSize:11,color:'#6b7280',cursor:'pointer',textAlign:'right',padding:'4px 0'}}>
-                      {showDirectWA?'▲':'▼'} שליחה ישירה בוואטסאפ (ללא מניצ'ט)
-                    </button>
-                    {showDirectWA&&(
-                      <div style={{marginTop:8}}>
-                        <div style={{fontSize:11,color:'#374151',fontWeight:700,marginBottom:4}}>✏️ הודעה ({'{שם}'} יוחלף):</div>
-                        <textarea value={autoMsg} onChange={e=>setAutoMsg(e.target.value)}
-                          style={{width:'100%',boxSizing:'border-box',minHeight:90,borderRadius:8,border:'1px solid #bfdbfe',padding:'9px',fontSize:11,lineHeight:1.7,resize:'vertical',fontFamily:'inherit',outline:'none',marginBottom:8,background:'#f8faff'}}/>
-                        {autoCustomers.length===0
-                          ? <div style={{textAlign:'center',color:'#9ca3af',fontSize:12}}>אין לקוחות עם טלפון השבוע</div>
-                          : (()=>{
-                              const sentCount=autoCustomers.filter(c=>autoSent[c.phone]).length;
-                              const pending=autoCustomers.filter(c=>!autoSent[c.phone]);
-                              const done=autoCustomers.filter(c=>autoSent[c.phone]);
-                              return <>
-                                {sentCount>0&&<div style={{fontSize:11,color:'#16a34a',fontWeight:700,marginBottom:6}}>✅ נשלח ל-{sentCount}</div>}
-                                <div style={{maxHeight:260,overflowY:'auto',borderRadius:8,border:'1px solid #e0e7ff',background:'#fff'}}>
-                                  {[...pending,...done].map((cust,i)=>{
-                                    const isSent=!!autoSent[cust.phone];
-                                    const raw=cust.phone.replace(/\D/g,'').replace(/^0/,'');
-                                    const waNum=raw.startsWith('972')?raw:'972'+raw;
-                                    const msg=autoMsg.replace(/\{שם\}/g,cust.name);
-                                    return (
-                                      <div key={cust.phone+i} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',borderBottom:'1px solid #f0f4ff',opacity:isSent?.5:1}}>
-                                        <div style={{width:28,height:28,borderRadius:'50%',background:isSent?'#dcfce7':'#dbeafe',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:900,color:isSent?'#166534':'#1d4ed8',flexShrink:0}}>
-                                          {isSent?'✓':(cust.name||'?')[0]}
-                                        </div>
-                                        <div style={{flex:1,minWidth:0}}>
-                                          <div style={{fontSize:12,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cust.name}</div>
-                                          <div style={{fontSize:10,color:'#6b7280'}}>{cust.coordName}{cust.city?' · '+cust.city:''}</div>
-                                        </div>
-                                        {!isSent
-                                          ? <a href={`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`} target="_blank" rel="noopener noreferrer"
-                                              onClick={()=>markAutoSent(cust.phone)}
-                                              style={{background:'#25d366',color:'#fff',borderRadius:8,padding:'5px 9px',fontSize:11,fontWeight:700,textDecoration:'none',flexShrink:0}}>💬 שלח</a>
-                                          : <span style={{fontSize:11,color:'#16a34a',fontWeight:700,flexShrink:0}}>✓</span>
-                                        }
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </>;
-                            })()
-                        }
-                      </div>
-                    )}
-                  </div>
                 </div>
               )}
             </div>
