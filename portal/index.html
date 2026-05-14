@@ -947,6 +947,65 @@ function ChecklistTab({staleCoords,coords}){
     });
     return list.sort((a,b)=>a.coordName.localeCompare(b.coordName,'he'));
   },[coords]);
+  const [popNewCustomers, setPopNewCustomers] = useState(null); // null=טרם הועלה
+  const [popFileName,    setPopFileName]    = useState('');
+  const [showDirectWA,   setShowDirectWA]   = useState(false);
+
+  function parseCSVText(raw){
+    const rows=[]; let field='',row=[],inQ=false;
+    const t=raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+    for(let i=0;i<t.length;i++){
+      const ch=t[i];
+      if(inQ){
+        if(ch==='"'&&t[i+1]==='"'){field+='"';i++;}
+        else if(ch==='"'){inQ=false;}
+        else{field+=ch;}
+      }else{
+        if(ch==='"'){inQ=true;}
+        else if(ch===','){row.push(field);field='';}
+        else if(ch==='\n'){row.push(field);if(row.some(c=>c.trim()))rows.push(row);field='';row=[];}
+        else{field+=ch;}
+      }
+    }
+    if(row.length||field){row.push(field);if(row.some(c=>c.trim()))rows.push(row);}
+    return rows;
+  }
+  function handlePopFile(e){
+    const file=e.target.files[0]; if(!file) return;
+    setPopFileName(file.name);
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const rows=parseCSVText(ev.target.result);
+      if(rows.length<2){setPopNewCustomers([]);return;}
+      const hdrs=rows[0];
+      const iName=hdrs.indexOf('שם לקוח');
+      const iFirst=hdrs.indexOf('הזמנה ראשונה');
+      const iPhone=hdrs.indexOf('טלפון');
+      if(iName<0||iFirst<0||iPhone<0){alert('לא זוהה פורמט פופ תקין');return;}
+      const seen=new Set();
+      const list=rows.slice(1)
+        .filter(r=>(r[iFirst]||'').toLowerCase()==='true')
+        .map(r=>({name:(r[iName]||'').trim(),phone:(r[iPhone]||'').replace(/\D/g,'')}))
+        .filter(r=>r.phone&&r.name&&!seen.has(r.phone)&&seen.add(r.phone));
+      setPopNewCustomers(list);
+    };
+    reader.readAsText(file,'UTF-8');
+    e.target.value='';
+  }
+  function downloadManychatCSV(customers){
+    const bom='﻿';
+    const hdr='Phone,First Name,Last Name\n';
+    const body=customers.map(c=>{
+      const p=c.phone.startsWith('972')?'+'+c.phone:'+972'+c.phone.replace(/^0/,'');
+      const parts=c.name.trim().split(/\s+/);
+      return `"${p}","${parts[0]||''}","${parts.slice(1).join(' ')}"`;
+    }).join('\n');
+    const blob=new Blob([bom+hdr+body],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=`manychat_new_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+
   const [daySummaries,setDaySummaries]=useState(()=>{
     // load saved summaries for this week's actual dates
     const out={};
@@ -1059,59 +1118,130 @@ function ChecklistTab({staleCoords,coords}){
           {n===0&&(
             <div style={{marginTop:10,borderTop:'1px solid #dbeafe',paddingTop:10}}>
               <button onClick={()=>setShowAuto(v=>!v)}
-                style={{width:'100%',background:showAuto?'#dbeafe':'#eff6ff',border:'1px solid #bfdbfe',borderRadius:8,padding:'9px 12px',fontSize:12,fontWeight:700,color:'#1d4ed8',cursor:'pointer',textAlign:'right',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                <span>🤖 שליחת אוטומציה ללקוחות</span>
-                <span style={{background:'#1d4ed8',color:'#fff',borderRadius:12,padding:'1px 8px',fontSize:11}}>
-                  {autoCustomers.filter(c=>autoSent[c.phone]).length}/{autoCustomers.length}
-                </span>
+                style={{width:'100%',background:showAuto?'#dbeafe':'#eff6ff',border:'1px solid #bfdbfe',borderRadius:8,padding:'9px 12px',fontSize:12,fontWeight:700,color:'#1d4ed8',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                <span>🤖 אוטומציה מניצ'ט — לקוחות חדשים</span>
+                {popNewCustomers!==null&&<span style={{background:'#1d4ed8',color:'#fff',borderRadius:12,padding:'1px 8px',fontSize:11}}>{popNewCustomers.length} חדשים</span>}
               </button>
+
               {showAuto&&(
                 <div style={{marginTop:10}}>
-                  <div style={{fontSize:11,color:'#374151',fontWeight:700,marginBottom:4}}>✏️ הודעה ({'{שם}'} יוחלף בשם הלקוח):</div>
-                  <textarea
-                    value={autoMsg} onChange={e=>setAutoMsg(e.target.value)}
-                    style={{width:'100%',boxSizing:'border-box',minHeight:100,borderRadius:8,border:'1px solid #bfdbfe',padding:'9px',fontSize:12,lineHeight:1.7,resize:'vertical',fontFamily:'inherit',outline:'none',marginBottom:8,background:'#f8faff'}}
-                  />
-                  {autoCustomers.length===0
-                    ? <div style={{textAlign:'center',color:'#9ca3af',fontSize:12,padding:'10px 0'}}>אין לקוחות עם מספר טלפון השבוע</div>
-                    : (()=>{
-                        const sentCount=autoCustomers.filter(c=>autoSent[c.phone]).length;
-                        const pending=autoCustomers.filter(c=>!autoSent[c.phone]);
-                        const done=autoCustomers.filter(c=>autoSent[c.phone]);
-                        return <>
-                          {sentCount>0&&<div style={{fontSize:11,color:'#16a34a',fontWeight:700,marginBottom:6}}>✅ נשלח ל-{sentCount} לקוחות</div>}
-                          {pending.length>0&&<div style={{fontSize:11,color:'#6b7280',marginBottom:6}}>ממתינים לשליחה — {pending.length}</div>}
-                          <div style={{maxHeight:320,overflowY:'auto',borderRadius:8,border:'1px solid #e0e7ff',background:'#fff'}}>
-                            {[...pending,...done].map((cust,i)=>{
-                              const isSent=!!autoSent[cust.phone];
-                              const rawPhone=cust.phone.replace(/\D/g,'').replace(/^0/,'');
-                              const waNum=rawPhone.startsWith('972')?rawPhone:'972'+rawPhone;
-                              const msg=autoMsg.replace(/\{שם\}/g,cust.name);
-                              const waUrl=`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`;
-                              return (
-                                <div key={cust.phone+i} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderBottom:'1px solid #f0f4ff',opacity:isSent?.55:1}}>
-                                  <div style={{width:32,height:32,borderRadius:'50%',background:isSent?'#dcfce7':'#dbeafe',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900,color:isSent?'#166534':'#1d4ed8',flexShrink:0}}>
-                                    {isSent?'✓':(cust.name||'?')[0]}
-                                  </div>
-                                  <div style={{flex:1,minWidth:0}}>
-                                    <div style={{fontSize:12,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cust.name}</div>
-                                    <div style={{fontSize:10,color:'#6b7280'}}>{cust.coordName}{cust.city?' · '+cust.city:''}</div>
-                                  </div>
-                                  {!isSent&&(
-                                    <a href={waUrl} target="_blank" rel="noopener noreferrer"
-                                      onClick={()=>markAutoSent(cust.phone)}
-                                      style={{background:'#25d366',color:'#fff',border:'none',borderRadius:8,padding:'6px 10px',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',flexShrink:0}}>
-                                      💬 שלח
-                                    </a>
-                                  )}
-                                  {isSent&&<span style={{fontSize:11,color:'#16a34a',fontWeight:700,flexShrink:0}}>נשלח ✓</span>}
+                  {/* ── שלב 1: העלאת קובץ פופ ── */}
+                  <div style={{background:'#f8faff',border:'1px solid #bfdbfe',borderRadius:10,padding:'12px',marginBottom:10}}>
+                    <div style={{fontSize:12,fontWeight:700,color:'#1e40af',marginBottom:8}}>📂 שלב 1 — העלה את קובץ ה-CSV מפופ</div>
+                    <input type="file" id="pop_csv_input" accept=".csv" style={{display:'none'}} onChange={handlePopFile}/>
+                    <button onClick={()=>document.getElementById('pop_csv_input').click()}
+                      style={{...S.btn,background:'#1d4ed8',fontSize:13,width:'100%',marginBottom:8}}>
+                      📂 {popFileName?'החלף קובץ מפופ':'בחר קובץ מפופ (CSV)'}
+                    </button>
+                    {popFileName&&<div style={{fontSize:10,color:'#6b7280',marginBottom:6,wordBreak:'break-all'}}>📄 {popFileName}</div>}
+
+                    {popNewCustomers===null&&(
+                      <div style={{fontSize:11,color:'#6b7280',textAlign:'center',padding:'4px 0'}}>
+                        הקובץ יורד מפופ → ייצוא הזמנות → CSV
+                      </div>
+                    )}
+                    {popNewCustomers!==null&&popNewCustomers.length===0&&(
+                      <div style={{fontSize:12,color:'#f59e0b',fontWeight:700,textAlign:'center',padding:'4px 0'}}>
+                        ⚠️ לא נמצאו לקוחות עם "הזמנה ראשונה = true" בקובץ זה
+                      </div>
+                    )}
+                    {popNewCustomers!==null&&popNewCustomers.length>0&&(
+                      <>
+                        <div style={{fontSize:12,color:'#166534',fontWeight:700,marginBottom:8}}>
+                          ✅ נמצאו {popNewCustomers.length} לקוחות חדשים בפעם הראשונה
+                        </div>
+                        <div style={{maxHeight:180,overflowY:'auto',borderRadius:8,border:'1px solid #bfdbfe',background:'#fff',marginBottom:10}}>
+                          {popNewCustomers.map((c,i)=>{
+                            const p=c.phone.startsWith('972')?'+'+c.phone:'+972'+c.phone.replace(/^0/,'');
+                            return (
+                              <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',borderBottom:'1px solid #eff6ff',fontSize:12}}>
+                                <div style={{width:26,height:26,borderRadius:'50%',background:'#dbeafe',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:900,color:'#1d4ed8',flexShrink:0}}>
+                                  {(c.name||'?')[0]}
                                 </div>
-                              );
-                            })}
-                          </div>
-                        </>;
-                      })()
-                  }
+                                <div style={{flex:1,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</div>
+                                <div style={{fontSize:10,color:'#6b7280',flexShrink:0}}>{p}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* ── שלב 2: הורדת CSV למניצ'ט ── */}
+                  {popNewCustomers!==null&&popNewCustomers.length>0&&(
+                    <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:10,padding:'12px',marginBottom:10}}>
+                      <div style={{fontSize:12,fontWeight:700,color:'#166534',marginBottom:8}}>📥 שלב 2 — הורד CSV למניצ'ט</div>
+                      <button onClick={()=>downloadManychatCSV(popNewCustomers)}
+                        style={{...S.btn,background:'#16a34a',fontSize:13,width:'100%',marginBottom:8}}>
+                        📥 הורד CSV למניצ'ט ({popNewCustomers.length} אנשי קשר)
+                      </button>
+                      <div style={{fontSize:10,color:'#6b7280'}}>פורמט: Phone · First Name · Last Name — מוכן להעלאה ישירה</div>
+                    </div>
+                  )}
+
+                  {/* ── שלב 3: לינק למניצ'ט ── */}
+                  {popNewCustomers!==null&&popNewCustomers.length>0&&(
+                    <div style={{background:'#fef9ee',border:'1px solid #fde68a',borderRadius:10,padding:'12px',marginBottom:10}}>
+                      <div style={{fontSize:12,fontWeight:700,color:'#92400e',marginBottom:8}}>📲 שלב 3 — עבור למניצ'ט ושלח שידור</div>
+                      <a href="https://app.manychat.com" target="_blank" rel="noopener noreferrer"
+                        style={{...S.btn,background:'#f59e0b',fontSize:13,display:'block',textAlign:'center',textDecoration:'none',marginBottom:6}}>
+                        🔗 פתח מניצ'ט
+                      </a>
+                      <div style={{fontSize:10,color:'#78350f'}}>Contacts → Import → Upload CSV → לאחר מכן Broadcasts → New Broadcast → בחר תבנית קיימת</div>
+                    </div>
+                  )}
+
+                  {/* ── שליחה ישירה (גיבוי) ── */}
+                  <div style={{borderTop:'1px dashed #c7d2fe',paddingTop:8}}>
+                    <button onClick={()=>setShowDirectWA(v=>!v)}
+                      style={{width:'100%',background:'transparent',border:'none',fontSize:11,color:'#6b7280',cursor:'pointer',textAlign:'right',padding:'4px 0'}}>
+                      {showDirectWA?'▲':'▼'} שליחה ישירה בוואטסאפ (ללא מניצ'ט)
+                    </button>
+                    {showDirectWA&&(
+                      <div style={{marginTop:8}}>
+                        <div style={{fontSize:11,color:'#374151',fontWeight:700,marginBottom:4}}>✏️ הודעה ({'{שם}'} יוחלף):</div>
+                        <textarea value={autoMsg} onChange={e=>setAutoMsg(e.target.value)}
+                          style={{width:'100%',boxSizing:'border-box',minHeight:90,borderRadius:8,border:'1px solid #bfdbfe',padding:'9px',fontSize:11,lineHeight:1.7,resize:'vertical',fontFamily:'inherit',outline:'none',marginBottom:8,background:'#f8faff'}}/>
+                        {autoCustomers.length===0
+                          ? <div style={{textAlign:'center',color:'#9ca3af',fontSize:12}}>אין לקוחות עם טלפון השבוע</div>
+                          : (()=>{
+                              const sentCount=autoCustomers.filter(c=>autoSent[c.phone]).length;
+                              const pending=autoCustomers.filter(c=>!autoSent[c.phone]);
+                              const done=autoCustomers.filter(c=>autoSent[c.phone]);
+                              return <>
+                                {sentCount>0&&<div style={{fontSize:11,color:'#16a34a',fontWeight:700,marginBottom:6}}>✅ נשלח ל-{sentCount}</div>}
+                                <div style={{maxHeight:260,overflowY:'auto',borderRadius:8,border:'1px solid #e0e7ff',background:'#fff'}}>
+                                  {[...pending,...done].map((cust,i)=>{
+                                    const isSent=!!autoSent[cust.phone];
+                                    const raw=cust.phone.replace(/\D/g,'').replace(/^0/,'');
+                                    const waNum=raw.startsWith('972')?raw:'972'+raw;
+                                    const msg=autoMsg.replace(/\{שם\}/g,cust.name);
+                                    return (
+                                      <div key={cust.phone+i} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',borderBottom:'1px solid #f0f4ff',opacity:isSent?.5:1}}>
+                                        <div style={{width:28,height:28,borderRadius:'50%',background:isSent?'#dcfce7':'#dbeafe',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:900,color:isSent?'#166534':'#1d4ed8',flexShrink:0}}>
+                                          {isSent?'✓':(cust.name||'?')[0]}
+                                        </div>
+                                        <div style={{flex:1,minWidth:0}}>
+                                          <div style={{fontSize:12,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cust.name}</div>
+                                          <div style={{fontSize:10,color:'#6b7280'}}>{cust.coordName}{cust.city?' · '+cust.city:''}</div>
+                                        </div>
+                                        {!isSent
+                                          ? <a href={`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`} target="_blank" rel="noopener noreferrer"
+                                              onClick={()=>markAutoSent(cust.phone)}
+                                              style={{background:'#25d366',color:'#fff',borderRadius:8,padding:'5px 9px',fontSize:11,fontWeight:700,textDecoration:'none',flexShrink:0}}>💬 שלח</a>
+                                          : <span style={{fontSize:11,color:'#16a34a',fontWeight:700,flexShrink:0}}>✓</span>
+                                        }
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </>;
+                            })()
+                        }
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
