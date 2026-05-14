@@ -931,6 +931,22 @@ function ChecklistTab({staleCoords,coords}){
   const [weekSummary,setWeekSummary]=useState('');
   const [weekMeetingsLoading,setWeekMeetingsLoading]=useState(false);
   const [monthlyCount,setMonthlyCount]=useState(null); // null=loading
+  const [showAuto,setShowAuto]=useState(false);
+  const [autoSent,setAutoSent]=useState(()=>sto_get('pop_auto_sent_'+_sun.toDateString())||{});
+  const [autoMsg,setAutoMsg]=useState(`שלום {שם}! 🌿\nשמחים שהצטרפת לפופ ישראל השבוע!\nכל שבוע ירקות, פירות ומוצרים טריים ישר מהחקלאי — ללא דמי משלוח, ללא מינימום הזמנה ⚡\nהזמנות נפתחות כל ראשון ב-19:00 ועד חמישי ב-8:00.\nנשמח לראות אותך גם השבוע הבא! 🙏`);
+  function markAutoSent(phone){const n={...autoSent,[phone]:true};setAutoSent(n);sto_set('pop_auto_sent_'+_sun.toDateString(),n);}
+  const autoCustomers=React.useMemo(()=>{
+    const list=[]; const seen=new Set();
+    (coords||[]).forEach(c=>{
+      (c.orders||[]).forEach(o=>{
+        if(o.phone&&!seen.has(o.phone)){
+          seen.add(o.phone);
+          list.push({name:o.name||'לקוח',phone:o.phone,city:c.city||'',coordName:c.coordName||''});
+        }
+      });
+    });
+    return list.sort((a,b)=>a.coordName.localeCompare(b.coordName,'he'));
+  },[coords]);
   const [daySummaries,setDaySummaries]=useState(()=>{
     // load saved summaries for this week's actual dates
     const out={};
@@ -1039,6 +1055,67 @@ function ChecklistTab({staleCoords,coords}){
             </div>
           </div>
           {tasks.map(t=><CheckItem key={t.id} text={t.text} done={!!checked[t.id]} onToggle={()=>toggle(t.id)}/>)}
+          {/* ── אוטומציה ראשון ── */}
+          {n===0&&(
+            <div style={{marginTop:10,borderTop:'1px solid #dbeafe',paddingTop:10}}>
+              <button onClick={()=>setShowAuto(v=>!v)}
+                style={{width:'100%',background:showAuto?'#dbeafe':'#eff6ff',border:'1px solid #bfdbfe',borderRadius:8,padding:'9px 12px',fontSize:12,fontWeight:700,color:'#1d4ed8',cursor:'pointer',textAlign:'right',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                <span>🤖 שליחת אוטומציה ללקוחות</span>
+                <span style={{background:'#1d4ed8',color:'#fff',borderRadius:12,padding:'1px 8px',fontSize:11}}>
+                  {autoCustomers.filter(c=>autoSent[c.phone]).length}/{autoCustomers.length}
+                </span>
+              </button>
+              {showAuto&&(
+                <div style={{marginTop:10}}>
+                  <div style={{fontSize:11,color:'#374151',fontWeight:700,marginBottom:4}}>✏️ הודעה ({'{שם}'} יוחלף בשם הלקוח):</div>
+                  <textarea
+                    value={autoMsg} onChange={e=>setAutoMsg(e.target.value)}
+                    style={{width:'100%',boxSizing:'border-box',minHeight:100,borderRadius:8,border:'1px solid #bfdbfe',padding:'9px',fontSize:12,lineHeight:1.7,resize:'vertical',fontFamily:'inherit',outline:'none',marginBottom:8,background:'#f8faff'}}
+                  />
+                  {autoCustomers.length===0
+                    ? <div style={{textAlign:'center',color:'#9ca3af',fontSize:12,padding:'10px 0'}}>אין לקוחות עם מספר טלפון השבוע</div>
+                    : (()=>{
+                        const sentCount=autoCustomers.filter(c=>autoSent[c.phone]).length;
+                        const pending=autoCustomers.filter(c=>!autoSent[c.phone]);
+                        const done=autoCustomers.filter(c=>autoSent[c.phone]);
+                        return <>
+                          {sentCount>0&&<div style={{fontSize:11,color:'#16a34a',fontWeight:700,marginBottom:6}}>✅ נשלח ל-{sentCount} לקוחות</div>}
+                          {pending.length>0&&<div style={{fontSize:11,color:'#6b7280',marginBottom:6}}>ממתינים לשליחה — {pending.length}</div>}
+                          <div style={{maxHeight:320,overflowY:'auto',borderRadius:8,border:'1px solid #e0e7ff',background:'#fff'}}>
+                            {[...pending,...done].map((cust,i)=>{
+                              const isSent=!!autoSent[cust.phone];
+                              const rawPhone=cust.phone.replace(/\D/g,'').replace(/^0/,'');
+                              const waNum=rawPhone.startsWith('972')?rawPhone:'972'+rawPhone;
+                              const msg=autoMsg.replace(/\{שם\}/g,cust.name);
+                              const waUrl=`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`;
+                              return (
+                                <div key={cust.phone+i} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderBottom:'1px solid #f0f4ff',opacity:isSent?.55:1}}>
+                                  <div style={{width:32,height:32,borderRadius:'50%',background:isSent?'#dcfce7':'#dbeafe',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900,color:isSent?'#166534':'#1d4ed8',flexShrink:0}}>
+                                    {isSent?'✓':(cust.name||'?')[0]}
+                                  </div>
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontSize:12,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cust.name}</div>
+                                    <div style={{fontSize:10,color:'#6b7280'}}>{cust.coordName}{cust.city?' · '+cust.city:''}</div>
+                                  </div>
+                                  {!isSent&&(
+                                    <a href={waUrl} target="_blank" rel="noopener noreferrer"
+                                      onClick={()=>markAutoSent(cust.phone)}
+                                      style={{background:'#25d366',color:'#fff',border:'none',borderRadius:8,padding:'6px 10px',fontSize:12,fontWeight:700,cursor:'pointer',textDecoration:'none',flexShrink:0}}>
+                                      💬 שלח
+                                    </a>
+                                  )}
+                                  {isSent&&<span style={{fontSize:11,color:'#16a34a',fontWeight:700,flexShrink:0}}>נשלח ✓</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>;
+                      })()
+                  }
+                </div>
+              )}
+            </div>
+          )}
           {/* כפתור סיכום יום */}
           <div style={{marginTop:10,borderTop:'1px solid #e8ede9',paddingTop:10}}>
             <button onClick={()=>{
