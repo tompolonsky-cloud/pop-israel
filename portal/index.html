@@ -537,6 +537,52 @@ const STATUS_EMOJI  = { red:'🔴', yellow:'🟡', green:'🟢' };
 const STATUS_BG     = { red:'#fef2f2', yellow:'#fffbeb', green:'#f0fdf4' };
 const STATUS_BORDER = { red:'#fca5a5', yellow:'#fcd34d', green:'#86efac' };
 
+// ══════════════════════════════════════════════
+// Commission CSV export
+// ══════════════════════════════════════════════
+function exportCommissionCSV(month, coords, coordHistory) {
+  const [yearStr, monStr] = month.split('-');
+  const year = parseInt(yearStr), mon = parseInt(monStr);
+  const cityMap = {};
+  (coords||[]).forEach(c=>{ cityMap[c.coordKey]=c.city||c.coordName||c.coordKey; });
+  const rows=[];
+  Object.entries(coordHistory||{}).forEach(([coordKey,history])=>{
+    const city=(cityMap[coordKey]||coordKey).trim().replace(/,+$/,'');
+    const station=city+'- תום';
+    (history||[]).forEach(h=>{
+      if(!h.date) return;
+      const d=new Date(h.date);
+      if(d.getFullYear()!==year||d.getMonth()+1!==mon) return;
+      const total=Math.round(h.revenue||0);
+      const vat=Math.round(total*0.02);
+      const net=total-vat;
+      const comm=Math.round(net*0.045);
+      const dd=String(d.getDate()).padStart(2,'0');
+      const mm=String(d.getMonth()+1).padStart(2,'0');
+      const yy=String(d.getFullYear()).slice(2);
+      rows.push([`${dd}/${mm}/${yy}`, station, total, vat, net, '4.50%', comm]);
+    });
+  });
+  if(!rows.length){alert('אין נתונים לחודש זה — ודאי שהיסטוריה נשמרה בעת שליחת ההתראות');return;}
+  rows.sort((a,b)=>{
+    const p=s=>{const[d,m,y]=s.split('/').map(Number);return new Date(2000+y,m-1,d).getTime();};
+    return p(a[0])-p(b[0]);
+  });
+  const totT=rows.reduce((s,r)=>s+r[2],0), totV=rows.reduce((s,r)=>s+r[3],0);
+  const totN=rows.reduce((s,r)=>s+r[4],0), totC=rows.reduce((s,r)=>s+r[6],0);
+  rows.push(['','סה"כ',totT,totV,totN,'',totC]);
+  const hdr=['תאריך','שם העמדה','סה"כ הזמנות השבוע','מעמ','סה"כ מכירות בניכוי מעמ','אחוזי עמלה','תשלום עמלה'];
+  const csv=[hdr,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.target='_blank';
+  const MN=['','ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+  a.download=`עמלות_${MN[mon]}_${year}.csv`;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},200);
+}
+
 function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedAt,memberData,coordHistory,
     deliveryDays={},groupNames={},adminTab='overview',onAdminTab,
     onSaveTimes,onSaveDrivers,onSaveWaLinks,onFireNotif,onSaveMemberData,onSaveDeliveryDays,onSaveGroupNames,
@@ -729,6 +775,23 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
             const sumMsg=`📊 סיכום שבוע ${week?.num||''} — פופ ישראל 🌿\n${coords.length} רכזים פעילים | ${totalOrders} הזמנות | ₪${totalRev.toLocaleString('he-IL')} סה"כ\n🟢 ${greens} ירוקים · 🟡 ${yellows} צהובים · 🔴 ${reds2} אדומים\n🏆 מוביל: ${top?.coordName||''} — ${top?.orders.length||0} הזמנות · ₪${topRev.toLocaleString('he-IL')}`;
             return <CopyBtnSimple text={sumMsg} label="📝 העתק סיכום שבועי"/>;
           })()}
+
+          <Card>
+            <p style={{...T.cardTitle,marginBottom:10}}>💰 ייצוא עמלות חודשי</p>
+            <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+              <input type="month" id="exp_month"
+                defaultValue={new Date().toISOString().slice(0,7)}
+                style={{flex:1,border:'1px solid #d1fae5',borderRadius:8,padding:'8px 10px',fontSize:13,minWidth:140}}/>
+              <button onClick={()=>{
+                const m=document.getElementById('exp_month').value;
+                if(!m){alert('בחר חודש');return;}
+                exportCommissionCSV(m, coords, coordHistory);
+              }} style={{...S.btn,background:'#2d6a4f',fontSize:13,whiteSpace:'nowrap'}}>
+                📥 ייצוא לאקסל
+              </button>
+            </div>
+            <div style={{fontSize:11,color:'#6b7280',marginTop:6}}>מכיל: עמלות 4.5%, מעמ 2%, לפי כל נקודות החלוקה החודש</div>
+          </Card>
 
         </>}
 
