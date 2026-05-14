@@ -857,12 +857,15 @@ function CheckItem({text,done,onToggle}){
   );
 }
 
+const TOM_PHONE = "972586682644"; // מספר תום
+
 function ChecklistTab({staleCoords,coords}){
   // weekly key — resets each Sunday
   const _d=new Date(), _sun=new Date(_d); _sun.setDate(_d.getDate()-_d.getDay());
   const weekKey="pop_checklist_w_"+_sun.toDateString();
   const [checked,setChecked]=useState(()=>sto_get(weekKey)||{});
   function toggle(id){const n={...checked,[id]:!checked[id]};setChecked(n);sto_set(weekKey,n);}
+  const [weekSummary,setWeekSummary]=useState('');
 
   const today=new Date().getDay();
 
@@ -892,7 +895,8 @@ function ChecklistTab({staleCoords,coords}){
     {n:4, label:"חמישי", tasks:[
       {id:"h1",text:"🚐 מלא נהגים לכל הרכזים (טאב 🚐)"},
       {id:"h2",text:"👥 עדכן מספר משתתפים + מצטרף אחרון בכל קבוצת וואטסאפ (טאב 👥)"},
-      {id:"h3",text:"🌙 בדוק פגישות למחרת"},
+      {id:"h3",text:"📋 שלח לתום סיכום פגישות השבוע בוואטסאפ"},
+      {id:"h4",text:"🌙 בדוק פגישות למחרת"},
     ]},
   ];
 
@@ -912,6 +916,27 @@ function ChecklistTab({staleCoords,coords}){
             </span>
           </div>
           {tasks.map(t=><CheckItem key={t.id} text={t.text} done={!!checked[t.id]} onToggle={()=>toggle(t.id)}/>)}
+          {n===4&&(
+            <div style={{marginTop:12,background:'#f0fdf4',borderRadius:10,padding:'12px'}}>
+              <div style={{fontSize:12,fontWeight:700,color:'#166534',marginBottom:6}}>📝 סיכום פגישות לשליחה לתום</div>
+              <textarea
+                value={weekSummary}
+                onChange={e=>setWeekSummary(e.target.value)}
+                placeholder={`לדוגמה:\n• [שם רכז/ת] — קיימנו פגישה, הרזולוציה: ...\n• [שם רכז/ת] — לא ענה, נחזור אליו שבוע הבא\n• [שם רכז/ת] — החליטה להצטרף 🎉`}
+                style={{width:'100%',boxSizing:'border-box',minHeight:110,borderRadius:8,border:'1px solid #bbf7d0',padding:'9px',fontSize:12,lineHeight:1.6,resize:'vertical',fontFamily:'inherit',outline:'none',marginBottom:8}}
+              />
+              <div style={{display:'flex',gap:8}}>
+                <button onClick={()=>{
+                  if(!weekSummary.trim()){alert('כתבי קודם את הסיכום 😊');return;}
+                  const msg=`שלום תום! 🌿\nסיכום פגישות השבוע:\n\n${weekSummary.trim()}\n\nשבוע טוב 🙏`;
+                  window.open(`https://wa.me/${TOM_PHONE}?text=${encodeURIComponent(msg)}`,'_blank');
+                  toggle('h3');
+                }} style={{...S.btn,flex:1,background:'#25d366',fontSize:13}}>
+                  💬 שלח לתום בוואטסאפ
+                </button>
+              </div>
+            </div>
+          )}
         </Card>
       );
     })}
