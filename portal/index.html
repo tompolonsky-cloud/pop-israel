@@ -844,37 +844,76 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
           </Card>
         </>}
 
-        {adTab==="members" && <>
-          <input value={search} onChange={e=>setSearch(e.target.value)}
-            placeholder="🔍 חיפוש לפי שם או עיר..."
-            style={{...S.input,marginBottom:12,fontSize:14}}/>
-          <Card>
-            <p style={{...T.cardTitle,marginBottom:6}}>👥 חברי קבוצות</p>
-            <p style={{fontSize:11,color:"#6b7280",marginBottom:14}}>עדכני פעם בשבוע — מספר חברים בקבוצת וואטסאפ ותאריך הצטרפות אחרון</p>
-            {filteredCoords.map(c=>{
-              const e=localMembers[c.coordKey]||{};
-              return (
-                <div key={c.coordKey} style={{padding:"10px 0",borderBottom:"1px solid #e8ede9"}}>
-                  <div style={{fontSize:13,fontWeight:700,marginBottom:7}}><CoordName name={c.coordName}/> <span style={{color:"#6b7280",fontWeight:400,fontSize:11}}>— {c.city}</span></div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                    <input type="number" min={0} placeholder="מס׳ חברים" value={e.count||""}
-                      onChange={ev=>setLocalMembers(prev=>({...prev,[c.coordKey]:{...(prev[c.coordKey]||{}),count:parseInt(ev.target.value)||0}}))}
-                      style={S.input}/>
-                    <input type="date" value={e.lastJoined||""}
-                      onChange={ev=>setLocalMembers(prev=>({...prev,[c.coordKey]:{...(prev[c.coordKey]||{}),lastJoined:ev.target.value}}))}
-                      style={{...S.input,direction:"ltr"}}/>
-                  </div>
+        {adTab==="members" && (()=>{
+          const totalNow  = Object.values(localMembers).reduce((s,e)=>s+(e?.count||0),0);
+          const totalPrev = Object.values(localMembers).reduce((s,e)=>s+(e?.prevCount!=null?e.prevCount:e?.count||0),0);
+          const totalDelta= totalNow - totalPrev;
+          const hasPrev   = Object.values(localMembers).some(e=>e?.prevCount!=null);
+          return <>
+            <input value={search} onChange={e=>setSearch(e.target.value)}
+              placeholder="🔍 חיפוש לפי שם או עיר..."
+              style={{...S.input,marginBottom:12,fontSize:14}}/>
+            {/* ── summary bar ── */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
+              <div style={S.statBox}>
+                <div style={{fontSize:16,marginBottom:2}}>👥</div>
+                <div style={S.statVal}>{totalNow.toLocaleString('he-IL')}</div>
+                <div style={S.statLbl}>סה"כ חברים</div>
+              </div>
+              <div style={{...S.statBox,background:hasPrev&&totalDelta>0?'#f0fdf4':hasPrev&&totalDelta<0?'#fef2f2':'#fafafa'}}>
+                <div style={{fontSize:16,marginBottom:2}}>{hasPrev?(totalDelta>0?'📈':totalDelta<0?'📉':'➡️'):'📊'}</div>
+                <div style={{...S.statVal,color:hasPrev&&totalDelta>0?'#16a34a':hasPrev&&totalDelta<0?'#dc2626':'#6b7280'}}>
+                  {hasPrev?(totalDelta>0?'+':'')+totalDelta.toLocaleString('he-IL'):'—'}
                 </div>
-              );
-            })}
-            <button style={{...S.btn,marginTop:14}} onClick={()=>{
-              const ts=new Date().toISOString();
-              const withTs=Object.fromEntries(Object.entries(localMembers).map(([k,v])=>[k,{...v,lastUpdated:ts}]));
-              setLocalMembers(withTs);
-              onSaveMemberData(withTs);
-            }}>💾 שמור</button>
-          </Card>
-        </>}
+                <div style={S.statLbl}>שינוי מהשבוע שעבר</div>
+              </div>
+            </div>
+            <Card>
+              <p style={{...T.cardTitle,marginBottom:6}}>👥 חברי קבוצות</p>
+              <p style={{fontSize:11,color:"#6b7280",marginBottom:14}}>עדכן ולחץ שמור — הספירה הישנה תישמר אוטומטית להשוואה</p>
+              {filteredCoords.map(c=>{
+                const e=localMembers[c.coordKey]||{};
+                const delta=(e.count||0)-(e.prevCount!=null?e.prevCount:(e.count||0));
+                const showDelta=e.prevCount!=null;
+                return (
+                  <div key={c.coordKey} style={{padding:"10px 0",borderBottom:"1px solid #e8ede9"}}>
+                    <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:7}}>
+                      <div style={{fontSize:13,fontWeight:700,flex:1}}><CoordName name={c.coordName}/> <span style={{color:"#6b7280",fontWeight:400,fontSize:11}}>— {c.city}</span></div>
+                      {showDelta&&(
+                        <span style={{fontSize:11,fontWeight:900,padding:'2px 7px',borderRadius:10,
+                          background:delta>0?'#dcfce7':delta<0?'#fee2e2':'#f3f4f6',
+                          color:delta>0?'#16a34a':delta<0?'#dc2626':'#6b7280'}}>
+                          {delta>0?'+':''}{delta}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                      <input type="number" min={0} placeholder="מס׳ חברים" value={e.count||""}
+                        onChange={ev=>setLocalMembers(prev=>({...prev,[c.coordKey]:{...(prev[c.coordKey]||{}),count:parseInt(ev.target.value)||0}}))}
+                        style={S.input}/>
+                      <input type="date" value={e.lastJoined||""}
+                        onChange={ev=>setLocalMembers(prev=>({...prev,[c.coordKey]:{...(prev[c.coordKey]||{}),lastJoined:ev.target.value}}))}
+                        style={{...S.input,direction:"ltr"}}/>
+                    </div>
+                    {showDelta&&e.prevCount!=null&&(
+                      <div style={{fontSize:10,color:'#9ca3af',marginTop:3}}>שבוע שעבר: {e.prevCount}</div>
+                    )}
+                  </div>
+                );
+              })}
+              <button style={{...S.btn,marginTop:14}} onClick={()=>{
+                const ts=new Date().toISOString();
+                const withTs=Object.fromEntries(Object.entries(localMembers).map(([k,v])=>{
+                  const savedCount=(memberData[k]||{}).count;
+                  const prev=savedCount!=null?savedCount:(v.prevCount!=null?v.prevCount:undefined);
+                  return [k,{...v,prevCount:prev!=null?prev:undefined,lastUpdated:ts}];
+                }));
+                setLocalMembers(withTs);
+                onSaveMemberData(withTs);
+              }}>💾 שמור (ושמור טרנד)</button>
+            </Card>
+          </>;
+        })()}
 
         {adTab==="drivers" && <>
           <input value={search} onChange={e=>setSearch(e.target.value)}
