@@ -7,9 +7,16 @@ const http  = require('http');
 // ── global safety net — prevents Railway crash-loop from unhandled errors ──
 process.on('unhandledRejection', (reason) => {
   console.error('⚠️  unhandledRejection:', reason);
+  // אל תיצא — Railway ידרוש restart מיותר
 });
 process.on('uncaughtException', (err) => {
-  console.error('⚠️  uncaughtException:', err);
+  console.error('⚠️  uncaughtException:', err.message);
+  // אם הפורט תפוס (EADDRINUSE) — יציאה נקייה כדי ש-Railway יוכל לרסטרט
+  if (err.code === 'EADDRINUSE') {
+    console.error('❌  Port already in use — exiting cleanly for Railway restart');
+    process.exit(1);
+  }
+  // אחרת — המשך לרוץ (log בלבד)
 });
 
 const app = express();
