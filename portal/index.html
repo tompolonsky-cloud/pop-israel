@@ -644,6 +644,53 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
         {adTab==="checklist" && <ChecklistTab staleCoords={staleCoords} coords={coords} showToast={showToast} week={week}/>}
 
         {adTab==="overview" && <>
+          {/* ── יעדים שבועיים ── */}
+          {(()=>{
+            const REV_TARGET=40000, ORD_TARGET=200;
+            const revPct=Math.min(100,Math.round(totalRev/REV_TARGET*100));
+            const ordPct=Math.min(100,Math.round(totalOrders/ORD_TARGET*100));
+            const revDone=totalRev>=REV_TARGET, ordDone=totalOrders>=ORD_TARGET;
+            const Bar=({pct,done})=>(
+              <div style={{height:8,borderRadius:4,background:'#e5e7eb',overflow:'hidden',marginTop:6}}>
+                <div style={{height:'100%',width:pct+'%',borderRadius:4,
+                  background:done?'#16a34a':pct>=75?'#22c55e':pct>=40?'#f59e0b':'#ef4444',
+                  transition:'width .4s'}}/>
+              </div>
+            );
+            return (
+              <Card style={{background:'#1a3c2e',color:'#fff',marginBottom:4,padding:'14px 16px'}}>
+                <div style={{fontSize:12,fontWeight:700,opacity:.8,marginBottom:10,letterSpacing:.5}}>🎯 יעדים שבועיים</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+                  <div>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
+                      <span style={{fontSize:11,opacity:.75}}>💰 מכירות</span>
+                      <span style={{fontSize:11,fontWeight:900,color:revDone?'#86efac':'#fff'}}>{revPct}%{revDone?' ✅':''}</span>
+                    </div>
+                    <div style={{fontSize:18,fontWeight:900,lineHeight:1.1}}>
+                      ₪{Math.round(totalRev).toLocaleString('he-IL')}
+                    </div>
+                    <div style={{fontSize:10,opacity:.6}}>מתוך ₪{REV_TARGET.toLocaleString('he-IL')}</div>
+                    <Bar pct={revPct} done={revDone}/>
+                  </div>
+                  <div>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
+                      <span style={{fontSize:11,opacity:.75}}>📋 מזמינים</span>
+                      <span style={{fontSize:11,fontWeight:900,color:ordDone?'#86efac':'#fff'}}>{ordPct}%{ordDone?' ✅':''}</span>
+                    </div>
+                    <div style={{fontSize:18,fontWeight:900,lineHeight:1.1}}>{totalOrders}</div>
+                    <div style={{fontSize:10,opacity:.6}}>מתוך {ORD_TARGET}</div>
+                    <Bar pct={ordPct} done={ordDone}/>
+                  </div>
+                </div>
+                {(revDone&&ordDone)&&(
+                  <div style={{marginTop:10,fontSize:12,fontWeight:700,color:'#86efac',textAlign:'center'}}>
+                    🏆 הגעת לשני היעדים השבוע!
+                  </div>
+                )}
+              </Card>
+            );
+          })()}
+
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
             {[[coords.length,"רכזים","🌿"],[totalOrders,"הזמנות","📋"],["₪"+totalRev.toLocaleString("he-IL"),"סה\"כ","💰"]].map(([v,l,ic])=>(
               <div key={l} style={S.statBox}><div style={{fontSize:18,marginBottom:3}}>{ic}</div><div style={S.statVal}>{v}</div><div style={S.statLbl}>{l}</div></div>
