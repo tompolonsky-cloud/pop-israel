@@ -641,7 +641,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
       </div>
 
       <Body>
-        {adTab==="checklist" && <ChecklistTab staleCoords={staleCoords} coords={coords} showToast={showToast}/>}
+        {adTab==="checklist" && <ChecklistTab staleCoords={staleCoords} coords={coords} showToast={showToast} week={week}/>}
 
         {adTab==="overview" && <>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
@@ -922,7 +922,7 @@ function CheckItem({text,done,onToggle}){
 
 const TOM_PHONE = "972586682644"; // מספר תום
 
-function ChecklistTab({staleCoords,coords}){
+function ChecklistTab({staleCoords,coords,showToast,week}){
   // weekly key — resets each Sunday
   const _d=new Date(), _sun=new Date(_d); _sun.setDate(_d.getDate()-_d.getDay());
   const weekKey="pop_checklist_w_"+_sun.toDateString();
@@ -988,6 +988,71 @@ function ChecklistTab({staleCoords,coords}){
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
     a.download=`manychat_new_${new Date().toISOString().slice(0,10)}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+
+  // ── computed coord groups ──
+  const pilotCoords    = React.useMemo(()=>(coords||[]).filter(c=>pilotInfo(c.launchDate).status==='pilot'),[coords]);
+  const redCoords      = React.useMemo(()=>(coords||[]).filter(c=>getCoordStatus(c)==='red'),[coords]);
+  const nonGreenCoords = React.useMemo(()=>(coords||[]).filter(c=>getCoordStatus(c)!=='green'),[coords]);
+
+  // ── panel open states ──
+  const [showPilotBasket, setShowPilotBasket] = useState(false);
+  const [showRedMsg,      setShowRedMsg]      = useState(false);
+  const [showLastDay,     setShowLastDay]     = useState(false);
+  const [leads,           setLeads]           = useState(null);
+  const [leadsLoading,    setLeadsLoading]    = useState(false);
+
+  // ── feature 7: drive CSV export ──
+  function exportWeeklyCSV(){
+    const bom='﻿';
+    const hdr='שם רכז,עיר,הזמנות,הכנסה (₪),סטטוס\n';
+    const body=[...(coords||[])].sort((a,b)=>STATUS_SORT[getCoordStatus(a)]-STATUS_SORT[getCoordStatus(b)])
+      .map(c=>{
+        const rev=c.orders.reduce((s,o)=>s+o.total,0);
+        return `"${c.coordName}","${c.city||''}",${c.orders.length},${Math.round(rev)},"${STATUS_EMOJI[getCoordStatus(c)]}"`;
+      }).join('\n');
+    const blob=new Blob([bom+hdr+body],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=`פופ_שבוע_${week?.num||''}_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+
+  // ── feature 5: weekly text archive ──
+  function buildWeekArchiveText(){
+    const total=(coords||[]).reduce((s,c)=>s+c.orders.length,0);
+    const rev=(coords||[]).reduce((s,c)=>s+c.orders.reduce((s2,o)=>s2+o.total,0),0);
+    const reds=(coords||[]).filter(c=>getCoordStatus(c)==='red');
+    const yellows=(coords||[]).filter(c=>getCoordStatus(c)==='yellow');
+    const greens=(coords||[]).filter(c=>getCoordStatus(c)==='green');
+    const top=[...(coords||[])].sort((a,b)=>b.orders.length-a.orders.length)[0];
+    const d=new Date(); const ds=`${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+    return `📊 ארכיון שבוע ${week?.num||''} — פופ ישראל 🌿\nתאריך: ${ds}\n\nסה"כ: ${total} הזמנות | ₪${Math.round(rev).toLocaleString('he-IL')}\n${(coords||[]).length} רכזים פעילים\n\n🟢 ירוק (${greens.length}): ${greens.map(c=>c.coordName).join(', ')||'—'}\n🟡 צהוב (${yellows.length}): ${yellows.map(c=>c.coordName).join(', ')||'—'}\n🔴 אדום (${reds.length}): ${reds.map(c=>c.coordName).join(', ')||'—'}\n${top?`\n🏆 מוביל: ${top.coordName} — ${top.orders.length} הזמנות`:''}`;
+  }
+
+  // ── feature 8: CRM leads ──
+  async function loadLeads(){
+    setLeadsLoading(true);
+    try{
+      const r=await fetch('/api/leads');
+      const d=await r.json();
+      setLeads(d.leads||[]);
+    }catch(e){setLeads([]);}
+    setLeadsLoading(false);
+  }
+
+  // ── message builders ──
+  function buildPilotBasketMsg(c){
+    return `שלום ${c.coordName}! 🧺\nתזכורת ידידותית — הזמיני סל לשבוע הבא לפני השעה 14:00 היום ⏰\nחשוב לנו לתכנן את הכמויות מהחקלאי 💚\nתודה! 🙏`;
+  }
+  function buildLastDayMsg(c){
+    const n=c.orders.length; const left=Math.max(0,5-n);
+    return `שלום ${c.coordName}! ⏰\nהיום יום אחרון — הזמנות נסגרות מחר ב-8:00!\nיש לך כבר ${n} הזמנות${left>0?` — עוד ${left} לסף הירוק 💪`:' — כל הכבוד! 🟢'}\nשתפי עכשיו בקבוצה 🌿\n${STORE_LINK_DEFAULT}`;
+  }
+  function buildRedFollowMsg(c){
+    return `שלום ${c.coordName}! 💚\nרואה שיש ${c.orders.length} הזמנות השבוע — הכל בסדר?\nיש משהו שאפשר לעזור? אנחנו כאן 🙏`;
+  }
+  function buildLeadFollowMsg(lead){
+    return `שלום ${lead.name}! 🌿\nרציתי לעקוב אחרי הפגישה שלנו מ-${lead.dateStr}.\nיש לך שאלות? נשמח לדבר 🙏`;
   }
 
   const [daySummaries,setDaySummaries]=useState(()=>{
@@ -1180,6 +1245,97 @@ function ChecklistTab({staleCoords,coords}){
               )}
             </div>
           )}
+          {/* ── ייצוא לדרייב (ראשון) ── */}
+          {n===0&&(
+            <div style={{marginTop:8}}>
+              <button onClick={exportWeeklyCSV}
+                style={{width:'100%',background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:8,padding:'8px 12px',fontSize:12,fontWeight:700,color:'#0369a1',cursor:'pointer',textAlign:'right'}}>
+                📁 ייצוא לדרייב — שבוע {week?.num} CSV
+              </button>
+            </div>
+          )}
+
+          {/* ── תזכורת סל לפיילוט (שני) ── */}
+          {n===1&&pilotCoords.length>0&&(
+            <div style={{marginTop:10,borderTop:'1px solid #fde68a',paddingTop:10}}>
+              <button onClick={()=>setShowPilotBasket(v=>!v)}
+                style={{width:'100%',background:showPilotBasket?'#fef3c7':'#fffbeb',border:'1px solid #fcd34d',borderRadius:8,padding:'9px 12px',fontSize:12,fontWeight:700,color:'#92400e',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                <span>🧺 תזכורת סל לרכזי פיילוט</span>
+                <span style={{background:'#d97706',color:'#fff',borderRadius:12,padding:'1px 8px',fontSize:11}}>{pilotCoords.length}</span>
+              </button>
+              {showPilotBasket&&(
+                <div style={{marginTop:8,borderRadius:8,border:'1px solid #fde68a',overflow:'hidden'}}>
+                  {pilotCoords.map(c=>(
+                    <div key={c.coordKey} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderBottom:'1px solid #fef3c7',background:'#fffdf0'}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:12,fontWeight:700}}>{c.coordName}</div>
+                        <div style={{fontSize:10,color:'#92400e'}}>{c.city} · {c.orders.length} הז׳</div>
+                      </div>
+                      {c.coordPhone
+                        ? <a href={waLink(c.coordPhone, buildPilotBasketMsg(c))} target="_blank" rel="noopener noreferrer"
+                            style={{background:'#25d366',color:'#fff',borderRadius:8,padding:'5px 10px',fontSize:11,fontWeight:700,textDecoration:'none'}}>💬 שלח</a>
+                        : <span style={{fontSize:10,color:'#9ca3af'}}>אין טלפון</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── פולואפ אדומים (שני + שלישי) ── */}
+          {(n===1||n===2)&&redCoords.length>0&&(
+            <div style={{marginTop:10,borderTop:'1px solid #fca5a5',paddingTop:10}}>
+              <button onClick={()=>setShowRedMsg(v=>!v)}
+                style={{width:'100%',background:showRedMsg?'#fee2e2':'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,padding:'9px 12px',fontSize:12,fontWeight:700,color:'#991b1b',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                <span>📮 שלח הודעה לרכזים ב🔴</span>
+                <span style={{background:'#dc2626',color:'#fff',borderRadius:12,padding:'1px 8px',fontSize:11}}>{redCoords.length}</span>
+              </button>
+              {showRedMsg&&(
+                <div style={{marginTop:8,borderRadius:8,border:'1px solid #fca5a5',overflow:'hidden'}}>
+                  {redCoords.map(c=>(
+                    <div key={c.coordKey} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderBottom:'1px solid #fee2e2',background:'#fff5f5'}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:12,fontWeight:700}}>{c.coordName}</div>
+                        <div style={{fontSize:10,color:'#dc2626'}}>{c.city} · {c.orders.length} הז׳</div>
+                      </div>
+                      {c.coordPhone
+                        ? <a href={waLink(c.coordPhone, buildRedFollowMsg(c))} target="_blank" rel="noopener noreferrer"
+                            style={{background:'#25d366',color:'#fff',borderRadius:8,padding:'5px 10px',fontSize:11,fontWeight:700,textDecoration:'none'}}>💬 שלח</a>
+                        : <span style={{fontSize:10,color:'#9ca3af'}}>אין טלפון</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── תזכורת יום אחרון (רביעי) ── */}
+          {n===3&&nonGreenCoords.length>0&&(
+            <div style={{marginTop:10,borderTop:'1px solid #fca5a5',paddingTop:10}}>
+              <button onClick={()=>setShowLastDay(v=>!v)}
+                style={{width:'100%',background:showLastDay?'#fee2e2':'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,padding:'9px 12px',fontSize:12,fontWeight:700,color:'#991b1b',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                <span>⏰ תזכורת יום אחרון להזמנות</span>
+                <span style={{background:'#dc2626',color:'#fff',borderRadius:12,padding:'1px 8px',fontSize:11}}>{nonGreenCoords.length}</span>
+              </button>
+              {showLastDay&&(
+                <div style={{marginTop:8,borderRadius:8,border:'1px solid #fca5a5',overflow:'hidden'}}>
+                  {nonGreenCoords.map(c=>(
+                    <div key={c.coordKey} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderBottom:'1px solid #fee2e2',background:'#fff5f5'}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:12,fontWeight:700}}>{c.coordName}</div>
+                        <div style={{fontSize:10,color:'#dc2626'}}>{c.city} · {c.orders.length}/5 הז׳ · {STATUS_EMOJI[getCoordStatus(c)]}</div>
+                      </div>
+                      {c.coordPhone
+                        ? <a href={waLink(c.coordPhone, buildLastDayMsg(c))} target="_blank" rel="noopener noreferrer"
+                            style={{background:'#25d366',color:'#fff',borderRadius:8,padding:'5px 10px',fontSize:11,fontWeight:700,textDecoration:'none'}}>💬 שלח</a>
+                        : <span style={{fontSize:10,color:'#9ca3af'}}>אין טלפון</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* כפתור סיכום יום */}
           <div style={{marginTop:10,borderTop:'1px solid #e8ede9',paddingTop:10}}>
             <button onClick={()=>{
@@ -1221,11 +1377,61 @@ function ChecklistTab({staleCoords,coords}){
               }} style={{...S.btn,background:'#25d366',fontSize:13,width:'100%'}}>
                 💬 שלח לתום בוואטסאפ
               </button>
+              {/* ── ארכיון שבוע ── */}
+              <div style={{marginTop:12,borderTop:'1px solid #bbf7d0',paddingTop:12}}>
+                <div style={{fontSize:12,fontWeight:700,color:'#166534',marginBottom:8}}>📦 ארכיון שבוע מלא</div>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  <button onClick={exportWeeklyCSV}
+                    style={{...S.btn,background:'#0369a1',fontSize:12,flex:1}}>
+                    📁 CSV לדרייב
+                  </button>
+                  <CopyBtnSimple text={buildWeekArchiveText()} label="📋 העתק סיכום"/>
+                </div>
+              </div>
             </div>
           )}
         </Card>
       );
     })}
+    {/* ── פיצ'ר 8: לידים לפולואפ מה-CRM ── */}
+    <Card>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+        <p style={{...T.cardTitle}}>📞 לידים לפולואפ (CRM)</p>
+        {leads!==null&&<span style={{fontSize:11,fontWeight:700,color:'#6b7280'}}>{leads.length} ממתינים</span>}
+      </div>
+      <button onClick={loadLeads} disabled={leadsLoading}
+        style={{...S.btn,background:'#7c3aed',width:'100%',marginBottom:8,opacity:leadsLoading?.7:1}}>
+        {leadsLoading?'⏳ טוען...':leads===null?'🔄 טען לידים לפולואפ':'🔄 רענן'}
+      </button>
+      {leads!==null&&leads.length===0&&(
+        <div style={{textAlign:'center',color:'#16a34a',fontSize:12,padding:'8px 0'}}>✅ אין לידים ממתינים לפולואפ</div>
+      )}
+      {leads!==null&&leads.length>0&&(
+        <div style={{maxHeight:320,overflowY:'auto'}}>
+          {leads.map((l,i)=>{
+            const msg=buildLeadFollowMsg(l);
+            const phoneClean=l.phone?l.phone.replace(/\D/g,''):'';
+            const waNum=phoneClean?phoneClean.replace(/^0/,'972'):null;
+            return (
+              <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderBottom:'1px solid #f3f0ff'}}>
+                <div style={{width:32,height:32,borderRadius:'50%',background:'#ede9fe',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900,color:'#7c3aed',flexShrink:0}}>
+                  {(l.name||'?')[0]}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.name}</div>
+                  <div style={{fontSize:10,color:'#6b7280'}}>פגישה: {l.dateStr||'—'}</div>
+                </div>
+                {waNum
+                  ? <a href={`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`} target="_blank" rel="noopener noreferrer"
+                      style={{background:'#25d366',color:'#fff',borderRadius:8,padding:'5px 10px',fontSize:11,fontWeight:700,textDecoration:'none',flexShrink:0}}>💬 פולואפ</a>
+                  : <span style={{fontSize:10,color:'#9ca3af',flexShrink:0}}>אין טלפון</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+
     {(()=>{
       const MIN_ORD=5;
       const graduated=(coords||[]).filter(c=>{

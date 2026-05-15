@@ -186,6 +186,54 @@ app.get('/api/meetings', async (req, res) => {
   }
 });
 
+// ── GET /api/leads — meetings that happened but have no resolution yet
+// ══════════════════════════════════════════════
+let leadsCache = null, leadsCacheTime = 0;
+
+function parseLeadsCSV(text) {
+  const lines = text.split('\n').filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const hdr = parseLine(lines[0], ',').map(h => h.replace(/"/g,'').trim());
+  const iDate     = hdr.findIndex(h => h.includes('תאריך ושעת'));
+  const iHappened = hdr.findIndex(h => h.includes('בוצעה פגישה'));
+  const iRes      = hdr.findIndex(h => h.includes('חוות דעת'));
+  const iPhone    = hdr.findIndex(h => /טלפון|phone|נייד/i.test(h));
+  const results = [];
+  for (let i = 1; i < lines.length; i++) {
+    const c = parseLine(lines[i], ',');
+    if (!c || c.length < 2) continue;
+    const name = (c[0] || '').replace(/"/g,'').trim();
+    if (!name) continue;
+    const happened = iHappened >= 0 ? (c[iHappened]||'').replace(/"/g,'').trim().toUpperCase() : '';
+    if (happened !== 'TRUE') continue;
+    const dateStr = iDate >= 0 ? (c[iDate]||'').replace(/"/g,'').trim() : '';
+    const date    = parseMeetingDate(dateStr);
+    const res     = iRes >= 0 ? (c[iRes]||'').replace(/"/g,'').trim() : '';
+    const phone   = iPhone >= 0 ? (c[iPhone]||'').replace(/"/g,'').replace(/[-\s]/g,'').trim() : '';
+    results.push({ name, dateStr, date, resolution: res, phone });
+  }
+  return results;
+}
+
+app.get('/api/leads', async (req, res) => {
+  try {
+    const now = Date.now();
+    if (!leadsCache || now - leadsCacheTime > MEETINGS_TTL) {
+      const csv = await fetchURL(LEADS_SHEET_URL);
+      leadsCache = parseLeadsCSV(csv);
+      leadsCacheTime = now;
+    }
+    const followup = leadsCache.filter(l => !l.resolution || !l.resolution.trim());
+    res.json({
+      leads: followup.map(l => ({ name: l.name, dateStr: l.dateStr, resolution: l.resolution, phone: l.phone })),
+      total: followup.length
+    });
+  } catch(e) {
+    console.error('leads error:', e.message);
+    res.status(500).json({ error: e.message, leads: [], total: 0 });
+  }
+});
+
 // ── POST /api/update — refresh.js posts CSV here
 app.post('/api/update', (req, res) => {
   const csv = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
