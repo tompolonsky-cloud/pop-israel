@@ -633,7 +633,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
       </GreenHeader>
 
       <div style={{background:"#1a3c2e",display:"flex",borderBottom:"2px solid #2d6a4f",overflowX:"auto"}}>
-        {[["checklist","✅"],["overview","📊"],["coords","🔗"],["members","👥"],["drivers","🚐"]].map(([k,l])=>(
+        {[["checklist","✅"],["overview","📊"],["coords","🔗"],["members","👥"],["drivers","🚐"],["guide","📖"]].map(([k,l])=>(
           <div key={k} onClick={()=>setAdTab(k)} style={{flex:"0 0 auto",padding:"10px 14px",textAlign:"center",fontSize:18,color:adTab===k?"#ffd166":"rgba(255,255,255,.45)",borderBottom:adTab===k?"2px solid #ffd166":"2px solid transparent",cursor:"pointer",marginBottom:-2}}>
             {l}
           </div>
@@ -984,6 +984,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
           </Card>
         </>}
 
+        {adTab==="guide" && <AdminGuide/>}
 
       </Body>
       <Toast msg={toast}/>
@@ -2052,24 +2053,171 @@ function CopyCard({title,sub,color,text,showToast}) {
   );
 }
 
+// ══════════════════════════════════════════════
+// ADMIN GUIDE — מדריך למגייסת
+// ══════════════════════════════════════════════
+const ADMIN_GUIDE_SECTIONS = [
+  {
+    id:"targets", icon:"📊", title:"סקירה ויעדים שבועיים",
+    items:[
+      {h:"יעד שבועי", b:"40,000 ₪ במכירות ו-200 מזמינים. פס ההתקדמות בראש לשונית 'סקירה'."},
+      {h:"צבעי סטטוס רכזים", b:"🟢 ירוק — עמד ביעד (5+ הזמנות או 400+ ₪). 🟡 צהוב — קרוב ליעד. 🔴 אדום — זקוק לתגבור."},
+      {h:"פיילוט / רגיל", b:"רכז חדש עובר 4 שבועות פיילוט. בכל שבוע מוצג שבוע הפיילוט ומועד ההשקה."},
+    ]
+  },
+  {
+    id:"checklist", icon:"✅", title:"צ'קליסט שבועי — יום אחרי יום",
+    items:[
+      {h:"ראשון — פתיחת שבוע", b:"✔ פתח שבוע חדש בכפתור 'פתח שבוע X'\n✔ שלח אוטומציה מניצ'ט ללקוחות חדשים (ראה סעיף אוטומציה)\n✔ הורד ארכיון שבוע שעבר (כפתור 📥 בכרטיס ראשון)"},
+      {h:"שני / שלישי — תגבור", b:"✔ בדוק רכזים אדומים ושלח פולואפ דרך כפתור 💬\n✔ שלח תזכורת סל לרכזי פיילוט לפני 14:00"},
+      {h:"רביעי — יום אחרון", b:"✔ שלח הודעת יום אחרון לרכזים שטרם עמדו ביעד\n✔ עקוב אחרי לידים ב-CRM שממתינים לפולואפ"},
+      {h:"חמישי — סגירה", b:"✔ הפעל את כפתור 'סכם שבוע' לכל יום\n✔ צלם תמונת מצב של הסטטיסטיקות לפני איפוס"},
+    ]
+  },
+  {
+    id:"manychat", icon:"🤖", title:"אוטומציה מניצ'ט — לקוחות חדשים",
+    items:[
+      {h:"שלב 1 — הורד קובץ מפופ", b:"היכנס לפופ ← הזמנות ← ייצוא Excel. הורד את הקובץ עם עמודות שם לקוח, הזמנה ראשונה, טלפון."},
+      {h:"שלב 2 — צור CSV מניצ'ט", b:"באפליקציה ← לשונית ✅ ← כרטיס 'ראשון (פתיחת שבוע)' ← לחץ '🤖 אוטומציה מניצ'ט' ← גרור את קובץ פופ ← לחץ '⬇️ הורד CSV למניצ'ט'. הקובץ יכלול רק לקוחות שהזמינו בפעם הראשונה בפורמט +972."},
+      {h:"שלב 3 — העלה למניצ'ט", b:"במניצ'ט ← Contacts ← Import ← CSV. לאחר ייבוא, פתח שידור בתבנית הרצויה."},
+      {h:"למה לא שולחים ישירות?", b:"שליחה ישירה מהמספר שלך עלולה לגרום לחסימה. מניצ'ט עושה זאת בצורה בטוחה ובקנה מידה גדול."},
+    ]
+  },
+  {
+    id:"commissions", icon:"💰", title:"עמלות חודשיות",
+    items:[
+      {h:"ייצוא עמלות", b:"לשונית 📊 ← גלול למטה ← כרטיס 'עמלות חודשיות' ← בחר חודש ← לחץ '⬇️ ייצא CSV'. הקובץ כולל: שם רכז, עיר, הזמנות, הכנסה, עמלה מחושבת."},
+      {h:"חישוב עמלה", b:"כל רכז מקבל אחוז מהכנסות הנקודה שלו. ניתן לראות את הסכום המחושב בעמודה 'עמלה' בקובץ."},
+    ]
+  },
+  {
+    id:"coords", icon:"🔗", title:"ניהול רכזים",
+    items:[
+      {h:"הוספת רכז", b:"ערוך את קובץ coordinators.json על השרת. הוסף שורה עם coordKey, coordName, city, launchDate."},
+      {h:"קישור וואטסאפ", b:"לשונית 🔗 ← מצא רכז ← הכנס לינק קבוצת וואטסאפ ← שמור. הלינק ישמש להודעות אוטומטיות."},
+      {h:"נהגים", b:"לשונית 🚐 ← חפש רכז ← מלא שם ומספר נהג. הנהג יופיע בפרטי הרכז."},
+      {h:"סטטוס פיילוט", b:"נקבע לפי תאריך ההשקה. 4 שבועות ראשונים = פיילוט, לאחר מכן = רגיל. אין צורך לעדכן ידנית."},
+    ]
+  },
+  {
+    id:"crm", icon:"📋", title:"לידים ו-CRM",
+    items:[
+      {h:"טעינת לידים", b:"בלשונית ✅ ← גלול לתחתית ← 'טען לידים לפולואפ'. המערכת מושכת פגישות שלא קיבלו מענה מ-Google Sheets."},
+      {h:"פולואפ", b:"לחץ על 💬 ליד כל ליד — נפתחת הודעת וואטסאפ מוכנה. לאחר שיחה — עדכן סטטוס ב-CRM."},
+    ]
+  },
+];
+
+function AdminGuide() {
+  const [open, setOpen] = useState(null);
+  return (
+    <div>
+      <Card style={{borderRight:"4px solid #ffd166",background:"#fffbf0"}}>
+        <p style={{fontSize:15,fontWeight:900,color:"#1a3c2e",marginBottom:4}}>📖 מדריך למגייסת</p>
+        <p style={{fontSize:12,color:"#6b7280",lineHeight:1.6}}>כל מה שצריך לדעת להפעלת המערכת יום-יום. לחץ על כל נושא לפרטים.</p>
+      </Card>
+      {ADMIN_GUIDE_SECTIONS.map(sec=>(
+        <Card key={sec.id} style={{padding:0,overflow:"hidden"}}>
+          <div onClick={()=>setOpen(open===sec.id?null:sec.id)}
+            style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px",cursor:"pointer",background:open===sec.id?"#f0fdf4":"#fff",transition:"background .2s"}}>
+            <span style={{fontSize:22}}>{sec.icon}</span>
+            <span style={{flex:1,fontSize:14,fontWeight:800,color:"#1a3c2e"}}>{sec.title}</span>
+            <span style={{color:"#9ca3af",fontSize:14,transition:"transform .2s",display:"inline-block",transform:open===sec.id?"rotate(180deg)":"rotate(0deg)"}}>▼</span>
+          </div>
+          {open===sec.id&&(
+            <div style={{borderTop:"1px solid #e8ede9",padding:"12px 16px 16px",display:"flex",flexDirection:"column",gap:10}}>
+              {sec.items.map((item,i)=>(
+                <div key={i} style={{background:"#f9fafb",borderRadius:10,padding:"12px 14px",borderRight:"3px solid #52b788"}}>
+                  <div style={{fontSize:13,fontWeight:800,color:"#1a3c2e",marginBottom:4}}>{item.h}</div>
+                  <div style={{fontSize:12,color:"#374151",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{item.b}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════
+// COORDINATOR FAQ / GUIDE
+// ══════════════════════════════════════════════
+const COORD_GUIDE_SECTIONS = [
+  {
+    id:"orders-guide", icon:"📋", title:"ניהול הזמנות",
+    items:[
+      {h:"איך רואים הזמנות?", b:"לשונית 📋 מציגה את כל ההזמנות לשבוע הנוכחי — שם, סכום, תאריך."},
+      {h:"מינימום לחלוקה", b:"5 הזמנות לפחות, או 400 ₪ (לנקודות קבועות). אם אתם מתחת — תקבלו התראה אדומה."},
+      {h:"מה עושים אם חסרות הזמנות?", b:"השתמש בהודעת הדחיפה בלשונית 📋 — העתק ושלח לקבוצה. ניתן גם ללחוץ 💬 לפתיחה ישירה בוואטסאפ."},
+    ]
+  },
+  {
+    id:"messages-guide", icon:"📤", title:"הודעות מוכנות",
+    items:[
+      {h:"מה יש בלשונית הודעות?", b:"הודעות מוכנות לשבוע הנוכחי: פתיחת שבוע, תזכורת אחרון, אחרי חלוקה ועוד."},
+      {h:"הודעת פיילוט", b:"בזמן הפיילוט (4 שבועות ראשונים) — תמצאי הודעה מוכנה לגיוס שכנים. העתיקי ושלחי לחברים ובקבוצות שייכות."},
+      {h:"טיפ", b:"כדאי לשלוח הודעת פתיחה ביום ראשון בערב ותזכורת ביום רביעי."},
+    ]
+  },
+  {
+    id:"customers-guide", icon:"👥", title:"רשימת לקוחות",
+    items:[
+      {h:"איך רואים לקוחות?", b:"לשונית 👥 מציגה את כל הלקוחות שהזמינו אצלך עד כה."},
+      {h:"שמירת לקוחות", b:"הרשימה נשמרת גם כשהשבוע מתחלף — לקוח שהזמין פעם אחת ישאר ברשימה."},
+      {h:"ייצוא", b:"לחץ 'ייצא CSV' לקבלת קובץ עם כל הלקוחות — שם, טלפון."},
+    ]
+  },
+  {
+    id:"reminders-guide", icon:"🔔", title:"תזכורות",
+    items:[
+      {h:"תזכורות פעילות", b:"תזכורות אוטומטיות לפי שלב השבוע מופיעות בראש לשונית 🔔."},
+      {h:"אפשור נוטיפיקציות", b:"לחץ 'אפשר תזכורות' ואשר בדפדפן. תקבל עדכון כשהחנות נפתחת/נסגרת."},
+      {h:"הודעת פיילוט", b:"בתקופת הפיילוט — הודעה מוכנה לגיוס חברים חדשים זמינה בלשונית זו."},
+    ]
+  },
+];
+
 function FaqTab() {
   const [open,setOpen]=useState(null);
   return (
-    <Card>
-      <p style={{...T.cardTitle,marginBottom:6}}>❓ שאלות נפוצות</p>
-      {FAQ.map((f,i)=>(
-        <div key={i} style={{borderBottom:"1px solid #e8ede9"}}>
-          <div onClick={()=>setOpen(open===i?null:i)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",cursor:"pointer"}}>
-            <span style={{fontSize:13,fontWeight:700,color:"#1a3c2e",flex:1,paddingLeft:8}}>{f.q}</span>
-            <span style={{color:"#6b7280",fontSize:16}}>{open===i?"▲":"▼"}</span>
+    <div>
+      {COORD_GUIDE_SECTIONS.map(sec=>(
+        <Card key={sec.id} style={{padding:0,overflow:"hidden",marginBottom:10}}>
+          <div onClick={()=>setOpen(open===sec.id?null:sec.id)}
+            style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px",cursor:"pointer",background:open===sec.id?"#f0fdf4":"#fff",transition:"background .2s"}}>
+            <span style={{fontSize:20}}>{sec.icon}</span>
+            <span style={{flex:1,fontSize:13,fontWeight:800,color:"#1a3c2e"}}>{sec.title}</span>
+            <span style={{color:"#9ca3af",fontSize:13,transition:"transform .2s",display:"inline-block",transform:open===sec.id?"rotate(180deg)":"rotate(0deg)"}}>▼</span>
           </div>
-          {open===i&&<div style={{paddingBottom:12}}>
-            <div style={{background:"#f0fdf4",borderRadius:8,padding:"10px 12px",fontSize:13,color:"#374151",lineHeight:1.6,marginBottom:8}}>{f.a}</div>
-            <CopyBtnSimple text={`${f.q}\n${f.a}`} label="📋 העתק תשובה"/>
-          </div>}
-        </div>
+          {open===sec.id&&(
+            <div style={{borderTop:"1px solid #e8ede9",padding:"10px 14px 14px",display:"flex",flexDirection:"column",gap:8}}>
+              {sec.items.map((item,i)=>(
+                <div key={i} style={{background:"#f9fafb",borderRadius:9,padding:"10px 12px",borderRight:"3px solid #52b788"}}>
+                  <div style={{fontSize:13,fontWeight:800,color:"#1a3c2e",marginBottom:3}}>{item.h}</div>
+                  <div style={{fontSize:12,color:"#374151",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{item.b}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
       ))}
-    </Card>
+      <Card>
+        <p style={{...T.cardTitle,marginBottom:6}}>❓ שאלות נפוצות</p>
+        {FAQ.map((f,i)=>(
+          <div key={i} style={{borderBottom:"1px solid #e8ede9"}}>
+            <div onClick={()=>setOpen(open===i?null:i)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",cursor:"pointer"}}>
+              <span style={{fontSize:13,fontWeight:700,color:"#1a3c2e",flex:1,paddingLeft:8}}>{f.q}</span>
+              <span style={{color:"#6b7280",fontSize:16}}>{open===i?"▲":"▼"}</span>
+            </div>
+            {open===i&&<div style={{paddingBottom:12}}>
+              <div style={{background:"#f0fdf4",borderRadius:8,padding:"10px 12px",fontSize:13,color:"#374151",lineHeight:1.6,marginBottom:8}}>{f.a}</div>
+              <CopyBtnSimple text={`${f.q}\n${f.a}`} label="📋 העתק תשובה"/>
+            </div>}
+          </div>
+        ))}
+      </Card>
+    </div>
   );
 }
 
