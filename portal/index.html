@@ -142,6 +142,34 @@ function isUrgent() {
   return false;
 }
 
+// מחשב מתי ההזמנות נסגרות — ד׳=רביעי 8:00, ברירת מחדל חמישי 8:00
+function getOrderDeadline(delivDay) {
+  const HDAYS = {'א':0,'ב':1,'ג':2,'ד':3,'ה':4,'ו':5,'ש':6};
+  const closeDay = (delivDay && HDAYS[delivDay] !== undefined) ? HDAYS[delivDay] : 4;
+  const now = new Date();
+  const d = new Date(now);
+  let daysUntil = (closeDay - now.getDay() + 7) % 7;
+  if (daysUntil === 0 && now.getHours() >= 8) daysUntil = 7;
+  d.setDate(now.getDate() + daysUntil);
+  d.setHours(8, 0, 0, 0);
+  return d;
+}
+
+// תחזית הכנסה לסוף שבוע לפי קצב נוכחי
+function getRevenueForecast(totalRev) {
+  const now = new Date();
+  const day = now.getDay();
+  if (day > 4 || (day === 4 && now.getHours() >= 8)) return null;
+  const hr = now.getHours() + now.getMinutes() / 60;
+  // שעות שחלפו מאז ראשון 19:00 (פתיחת חנות)
+  const elapsed = day===0 ? Math.max(0, hr-19)
+    : day===1 ? 5+hr : day===2 ? 29+hr : day===3 ? 53+hr : 77+hr;
+  if (elapsed < 2 || totalRev <= 0) return null;
+  const TOTAL = 85; // חלון סה"כ: ראשון 19:00 → חמישי 8:00
+  if (elapsed >= TOTAL) return null;
+  return Math.round(totalRev / elapsed * TOTAL);
+}
+
 function getActiveReminders(pilot) {
   const now  = new Date();
   const day  = now.getDay(); // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
@@ -507,6 +535,7 @@ function App() {
       memberEntry={memberData[selCoord?.coordKey]||null}
       rank={coordRank?.rank} totalCoords={coordRank?.total}
       allCustomers={allTimeCustomers[selCoord?.coordKey]||{}}
+      deliveryDay={deliveryDays[selCoord?.coordKey]||null}
       tab={tab} setTab={setTab} toast={toast} showToast={showToast}/>;
 
   return null;
@@ -687,6 +716,16 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
                     🏆 הגעת לשני היעדים השבוע!
                   </div>
                 )}
+                {(()=>{const fc=getRevenueForecast(totalRev); return fc&&!revDone?(
+                  <div style={{marginTop:8,borderTop:'1px solid rgba(255,255,255,.12)',paddingTop:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <span style={{fontSize:11,opacity:.7}}>📈 תחזית סוף שבוע<Tip text="הערכה לפי הקצב הנוכחי — מחושב יחסית לשעות שחלפו מאז פתיחת החנות ביום ראשון 19:00." pos="above"/></span>
+                    <span style={{fontSize:13,fontWeight:900,color:'#fde68a'}}>≈ ₪{fc.toLocaleString('he-IL')}</span>
+                  </div>
+                ):null;})()}
+                <div style={{marginTop:8,borderTop:'1px solid rgba(255,255,255,.12)',paddingTop:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <span style={{fontSize:11,opacity:.7}}>🕐 סגירת הזמנות</span>
+                  <Countdown delivDay={null} style={{fontSize:12,fontWeight:900,color:'#86efac'}} label={false}/>
+                </div>
               </Card>
             );
           })()}
@@ -1683,7 +1722,7 @@ function Confetti({colors}) {
 
 // COORDINATOR SCREEN — same as v5
 // ══════════════════════════════════════════════
-function CoordScreen({coord,driver,waGroupLink,week,onBack,tab,setTab,toast,showToast,updatedAt,history,memberEntry,rank,totalCoords,allCustomers={}}) {
+function CoordScreen({coord,driver,waGroupLink,week,onBack,tab,setTab,toast,showToast,updatedAt,history,memberEntry,rank,totalCoords,allCustomers={},deliveryDay=null}) {
   if(!coord) return null;
   const totalRev=coord.orders.reduce((s,o)=>s+o.total,0);
   const orderCount=coord.orders.length;
@@ -1868,7 +1907,7 @@ function CoordScreen({coord,driver,waGroupLink,week,onBack,tab,setTab,toast,show
         ))}
       </div>
       <Body>
-        {tab==="orders"    && <OrdersTab coord={coord} showToast={showToast}/>}
+        {tab==="orders"    && <OrdersTab coord={coord} showToast={showToast} deliveryDay={deliveryDay} week={week}/>}
         {tab==="customers" && <CustomersTab allCustomers={allCustomers} showToast={showToast}/>}
         {tab==="messages"  && <MessagesTab coord={coord} week={week} pilot={pilot} driver={driver} waGroupLink={waGroupLink} justGraduated={justGraduated} pilotPassed={pilotPassed} beatLastWeek={beatLastWeek} beatOrders={beatOrders} beatRevenue={beatRevenue} lastWeek={lastWeek} orderCount={orderCount} totalRev={totalRev} hitMemberTarget={hitMemberTarget} memberEntry={memberEntry} showToast={showToast}/>}
         {tab==="reminders" && <RemindersTab coord={coord} pilot={pilot} activeReminders={activeReminders} waGroupLink={waGroupLink} history={history} showToast={showToast}/>}
@@ -1879,16 +1918,58 @@ function CoordScreen({coord,driver,waGroupLink,week,onBack,tab,setTab,toast,show
   );
 }
 
-function OrdersTab({coord,showToast}) {
+function OrdersTab({coord,showToast,deliveryDay=null,week}) {
   const [copied,setCopied]=useState(false);
   const [expanded,setExpanded]=useState(null);
+  const [arrivalTime,setArrivalTime]=useState(()=>{
+    const k=`pop_drv_${coord.coordKey}_${new Date().toISOString().slice(0,10)}`;
+    return localStorage.getItem(k)||'';
+  });
+  const [arrivalCopied,setArrivalCopied]=useState(false);
   const newCount=coord.orders.filter(o=>o.returning===false).length;
   const retCount=coord.orders.length-newCount;
+
+  function saveArrival(t){
+    const k=`pop_drv_${coord.coordKey}_${new Date().toISOString().slice(0,10)}`;
+    localStorage.setItem(k,t);
+    setArrivalTime(t);
+  }
+
+  function buildArrivalMsg(t){
+    const location=coord.city||coord.deliveryStr?.split(' - ')[0]||'נקודת האיסוף';
+    const names=coord.orders.map((o,i)=>`${i+1}. ${o.name||'—'}`).join('\n');
+    return `🚗 הנהג הגיע${t?` בשעה ${t}`:''}!\n\nהגיעו לאסוף (${coord.orders.length} הזמנות):\n${names}\n\n📍 ${location}\n\nמחכים לכם! 🌿`;
+  }
+
   function copyList(){
     const lines=[`שלום חברים! 😊`,`הנה רשימת המזמינים לחלוקה:`,"",...coord.orders.map((o,i)=>`${i+1}. ${o.name}${o.phone?" — "+fmtPhone(o.phone):""}`),"",`סה"כ ${coord.orders.length} מזמינים. מחכים לכם! 🌿`];
     navigator.clipboard.writeText(lines.join("\n")).then(()=>{setCopied(true);showToast("✅ הועתק");setTimeout(()=>setCopied(false),3500);});
   }
-  return (
+
+  const deadlineDayName = (()=>{
+    const HDAYS={'א':0,'ב':1,'ג':2,'ד':3,'ה':4};
+    const cd=deliveryDay&&HDAYS[deliveryDay]!==undefined?HDAYS[deliveryDay]:4;
+    return ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'][cd];
+  })();
+
+  return <>
+    {/* ── ספירה לאחור ── */}
+    <Card style={{background:'#1a3c2e',color:'#fff',padding:'12px 14px'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div>
+          <div style={{fontSize:11,opacity:.7,marginBottom:3,display:'flex',alignItems:'center',gap:4}}>
+            🕐 ההזמנות נסגרות ב{deadlineDayName} 8:00
+            <Tip text={deliveryDay==='ד'?"החנות שלך נסגרת ביום רביעי 8:00 בגלל חלוקה ביום רביעי.":"החנות נסגרת ביום חמישי 8:00. אחרי כן לא ניתן להוסיף הזמנות."} pos="above"/>
+          </div>
+          <div style={{fontSize:22,fontWeight:900,lineHeight:1}}>
+            <Countdown delivDay={deliveryDay} style={{fontSize:22,fontWeight:900,color:'#fff'}} label={false}/>
+          </div>
+        </div>
+        <div style={{fontSize:38,opacity:.2}}>⏰</div>
+      </div>
+    </Card>
+
+    {/* ── רשימת מזמינים ── */}
     <Card>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
         <div style={{display:'flex',alignItems:'center'}}><p style={{...T.cardTitle,margin:0}}>📋 רשימת מזמינים</p><Tip text="כל ההזמנות שהתקבלו אצלך השבוע. 🆕 = מזמין חדש · 🔄 = חוזר. לחץ על הזמנה לפירוט פריטים."/></div>
@@ -1933,7 +2014,34 @@ function OrdersTab({coord,showToast}) {
         {copied?"✅ הועתק — הדבק בקבוצה":"📋 העתק רשימה לוואטסאפ"}
       </button>
     </Card>
-  );
+
+    {/* ── הנהג הגיע ── */}
+    {coord.orders.length>0&&(
+      <Card style={{borderRight:'4px solid #25d366'}}>
+        <div style={{display:'flex',alignItems:'center',marginBottom:10}}>
+          <p style={{...T.cardTitle,margin:0,color:'#166534'}}>🚗 הנהג הגיע</p>
+          <Tip text="מלא את שעת הגעת הנהג ולחץ 'הכנסת ועתק' — תקבל הודעה מוכנה לשליחה לקבוצה עם שמות המזמינים ומיקום האיסוף."/>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:10}}>
+          <div style={{fontSize:13,fontWeight:700,color:'#374151',flexShrink:0}}>⏱ שעת הגעה:</div>
+          <input type="time" value={arrivalTime}
+            onChange={e=>saveArrival(e.target.value)}
+            style={{...S.input,flex:1,direction:'ltr',fontSize:15,fontWeight:700}}/>
+        </div>
+        <button
+          onClick={()=>{
+            navigator.clipboard.writeText(buildArrivalMsg(arrivalTime))
+              .then(()=>{setArrivalCopied(true);showToast('✅ הועתק — הדבק בקבוצה');setTimeout(()=>setArrivalCopied(false),3500);});
+          }}
+          style={{...S.btn,background:arrivalCopied?'#16a34a':'#25d366',color:'#fff',transition:'background .3s',marginBottom:8}}>
+          {arrivalCopied?'✅ הועתק':'📋 הכן ועתק הודעה לקבוצה'}
+        </button>
+        <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:8,padding:'10px 12px',fontSize:11,color:'#374151',whiteSpace:'pre-wrap',lineHeight:1.7,maxHeight:160,overflowY:'auto',direction:'rtl'}}>
+          {buildArrivalMsg(arrivalTime)}
+        </div>
+      </Card>
+    )}
+  </>;
 }
 
 function CustomersTab({allCustomers, showToast}) {
@@ -2060,7 +2168,9 @@ const ADMIN_GUIDE_SECTIONS = [
   {
     id:"targets", icon:"📊", title:"סקירה ויעדים שבועיים",
     items:[
-      {h:"יעד שבועי", b:"40,000 ₪ במכירות ו-200 מזמינים. פס ההתקדמות בראש לשונית 'סקירה'."},
+      {h:"יעד שבועי", b:"40,000 ₪ במכירות ו-200 מזמינים. פסי התקדמות בכרטיס היעדים בראש 'סקירה'."},
+      {h:"תחזית סוף שבוע", b:"מתחת ליעדים מופיעה תחזית ≈ לפי הקצב הנוכחי — מחושבת יחסית לשעות שחלפו מאז פתיחת החנות ביום ראשון."},
+      {h:"ספירה לאחור לסגירה", b:"בכרטיס היעדים מוצג כמה זמן נשאר עד חמישי 8:00 (סגירת הזמנות). הופך לאדום כשנשארות פחות מ-4 שעות."},
       {h:"צבעי סטטוס רכזים", b:"🟢 ירוק — עמד ביעד (5+ הזמנות או 400+ ₪). 🟡 צהוב — קרוב ליעד. 🔴 אדום — זקוק לתגבור."},
       {h:"פיילוט / רגיל", b:"רכז חדש עובר 4 שבועות פיילוט. בכל שבוע מוצג שבוע הפיילוט ומועד ההשקה."},
     ]
@@ -2145,11 +2255,13 @@ function AdminGuide() {
 // ══════════════════════════════════════════════
 const COORD_GUIDE_SECTIONS = [
   {
-    id:"orders-guide", icon:"📋", title:"ניהול הזמנות",
+    id:"orders-guide", icon:"📋", title:"ניהול הזמנות וחלוקה",
     items:[
-      {h:"איך רואים הזמנות?", b:"לשונית 📋 מציגה את כל ההזמנות לשבוע הנוכחי — שם, סכום, תאריך."},
-      {h:"מינימום לחלוקה", b:"5 הזמנות לפחות, או 400 ₪ (לנקודות קבועות). אם אתם מתחת — תקבלו התראה אדומה."},
-      {h:"מה עושים אם חסרות הזמנות?", b:"השתמש בהודעת הדחיפה בלשונית 📋 — העתק ושלח לקבוצה. ניתן גם ללחוץ 💬 לפתיחה ישירה בוואטסאפ."},
+      {h:"איך רואים הזמנות?", b:"לשונית 📋 מציגה את כל ההזמנות לשבוע הנוכחי — שם, סכום, 🆕 חדש / 🔄 חוזר. לחץ על הזמנה לפירוט פריטים."},
+      {h:"מינימום לחלוקה", b:"5 הזמנות לפחות, או 400 ₪ (לנקודות קבועות). אם מתחת — תקבל התראה אדומה."},
+      {h:"מה עושים אם חסרות הזמנות?", b:"השתמש בהודעת הדחיפה בלשונית 📋 — העתק ושלח לקבוצה."},
+      {h:"ספירה לאחור לסגירה", b:"בראש לשונית 📋 יש שעון שמציג כמה זמן נשאר עד סגירת ההזמנות. חלוקה ביום רביעי = סגירה ברביעי 8:00."},
+      {h:"הנהג הגיע — הודעה לקבוצה", b:"בלשונית 📋 — כרטיס 'הנהג הגיע' 🚗\n1. מלא את שעת הגעת הנהג\n2. לחץ 'הכן ועתק הודעה לקבוצה'\n3. הדבק בקבוצת הוואטסאפ\nההודעה כוללת את שמות כל המזמינים ומיקום האיסוף."},
     ]
   },
   {
@@ -2314,6 +2426,23 @@ function CopyBtnSimple({text,label}){
     {c?"✅ הועתק":label}
   </button>;
 }
+function Countdown({delivDay, style={}, label=true}) {
+  const deadline = React.useMemo(()=>getOrderDeadline(delivDay),[delivDay]);
+  const [diff,setDiff] = useState(()=>deadline-new Date());
+  useEffect(()=>{
+    const t=setInterval(()=>setDiff(deadline-new Date()),30000);
+    return()=>clearInterval(t);
+  },[deadline]);
+  if(diff<=0) return <span style={{...style,color:'#ef4444'}}>ההזמנות סגורות ⛔</span>;
+  const h=Math.floor(diff/3600000), m=Math.floor((diff%3600000)/60000);
+  let str = h>=48 ? `${Math.floor(h/24)} ימים`
+    : h>=24 ? `יום ו-${h%24} שע'`
+    : h>=1  ? `${h}:${String(m).padStart(2,'0')} שע'`
+    : `${m} דק'`;
+  const urgent=h<4;
+  return <span style={{...style,color:urgent?'#ef4444':style.color}}>{label?'⏰ ':''}{str}</span>;
+}
+
 function Tip({text,pos}){
   const [show,setShow]=React.useState(false);
   const ref=React.useRef(null);
