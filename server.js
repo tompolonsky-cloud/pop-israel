@@ -4,6 +4,14 @@ const path = require('path');
 const https = require('https');
 const http  = require('http');
 
+// ── global safety net — prevents Railway crash-loop from unhandled errors ──
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️  unhandledRejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('⚠️  uncaughtException:', err);
+});
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE     = path.join(__dirname, 'data', 'latest.json');
@@ -55,7 +63,7 @@ app.get('/api/settings', (req, res) => res.json(settings));
 app.post('/api/settings', (req, res) => {
   if (typeof req.body !== 'object' || Array.isArray(req.body)) return res.status(400).json({ error: 'invalid' });
   settings = { ...settings, ...req.body };
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+  try { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2)); } catch(e) { console.error('settings write error:', e.message); }
   console.log(`⚙️  הגדרות עודכנו`);
   res.json({ ok: true });
 });
@@ -111,15 +119,21 @@ const MEETINGS_TTL = 30 * 60 * 1000; // 30 min
 function fetchURL(url, hops = 6) {
   return new Promise((resolve, reject) => {
     const lib = url.startsWith('https') ? https : http;
+    let settled = false;
+    const settle = (fn, val) => { if (!settled) { settled = true; fn(val); } };
     const req = lib.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, res => {
-      if ([301,302,303,307,308].includes(res.statusCode) && res.headers.location && hops > 0)
-        return fetchURL(res.headers.location, hops - 1).then(resolve).catch(reject);
+      res.on('error', err => settle(reject, err)); // חובה — מונע crash על socket destroy
+      if ([301,302,303,307,308].includes(res.statusCode) && res.headers.location && hops > 0) {
+        res.resume(); // release socket
+        return fetchURL(res.headers.location, hops - 1)
+          .then(r => settle(resolve, r)).catch(e => settle(reject, e));
+      }
       let data = '';
       res.on('data', d => data += d);
-      res.on('end', () => resolve(data));
+      res.on('end', () => settle(resolve, data));
     });
-    req.on('error', reject);
-    req.setTimeout(10000, () => { req.destroy(); reject(new Error('timeout')); });
+    req.on('error', err => settle(reject, err));
+    req.setTimeout(10000, () => req.destroy(new Error('timeout')));
   });
 }
 
