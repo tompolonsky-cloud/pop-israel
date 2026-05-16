@@ -170,7 +170,7 @@ function getRevenueForecast(totalRev) {
   return Math.round(totalRev / elapsed * TOTAL);
 }
 
-function getActiveReminders(pilot) {
+function getActiveReminders(pilot, deliveryDay=null) {
   const now  = new Date();
   const day  = now.getDay(); // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
   const hour = now.getHours();
@@ -196,6 +196,15 @@ function getActiveReminders(pilot) {
     id:'feedback', color:'#059669',
     title:'💬 שתף/י משוב על הסחורה',
     body:'קיבלת את הסל הראשון שלך השבוע שעבר — מה אהבת? מה פחות? שלח/י לנו פידבק.',
+  });
+
+  // בוקר יום החלוקה — תזכורת למלא שעת הגעת הנהג
+  const HDAYS={'א':0,'ב':1,'ג':2,'ד':3,'ה':4};
+  const delivDayNum = deliveryDay && HDAYS[deliveryDay]!==undefined ? HDAYS[deliveryDay] : 4;
+  if (day===delivDayNum && hour>=7 && hour<17) out.push({
+    id:'driver_arrive', color:'#25d366',
+    title:'🚗 מלא את שעת הגעת הנהג',
+    body:'היום יום החלוקה! עבור ללשונית 📋 הזמנות ← כרטיס "הנהג הגיע" ← מלא שעה ← שלח הודעה לקבוצה.',
   });
 
   return out;
@@ -1245,13 +1254,15 @@ function ChecklistTab({staleCoords,coords,showToast,week}){
     {n:3, label:"רביעי", tasks:[
       {id:"w1",text:"📊 בדוק סטטוס הזמנות — מי ב🔴 ומי צריך עזרה?"},
       {id:"w2",text:"🔔 שלח תזכורת לרכזי פיילוט — מחר יום אחרון להזמנות!"},
-      {id:"w3",text:"🌙 בדוק פגישות למחרת"},
+      {id:"w3",text:"🚗 הזכר לרכזי חלוקה ביום רביעי למלא שעת הגעת הנהג (טאב 📋)"},
+      {id:"w4",text:"🌙 בדוק פגישות למחרת"},
     ]},
     {n:4, label:"חמישי", tasks:[
       {id:"h1",text:"🚐 מלא נהגים לכל הרכזים (טאב 🚐)"},
-      {id:"h2",text:"👥 עדכן מספר משתתפים + מצטרף אחרון בכל קבוצת וואטסאפ (טאב 👥)"},
-      {id:"h3",text:"📋 שלח לתום סיכום פגישות השבוע בוואטסאפ"},
-      {id:"h4",text:"🌙 בדוק פגישות למחרת"},
+      {id:"h2",text:"🚗 הזכר לכל הרכזים למלא שעת הגעת הנהג (טאב 📋 בפורטל שלהם)"},
+      {id:"h3",text:"👥 עדכן מספר משתתפים + מצטרף אחרון בכל קבוצת וואטסאפ (טאב 👥)"},
+      {id:"h4",text:"📋 שלח לתום סיכום פגישות השבוע בוואטסאפ"},
+      {id:"h5",text:"🌙 בדוק פגישות למחרת"},
     ]},
   ];
 
@@ -1766,7 +1777,7 @@ function CoordScreen({coord,driver,waGroupLink,week,onBack,tab,setTab,toast,show
   const pilot=pilotInfo(coord.launchDate);
   const isRegular=pilot.status==='regular';
   const belowMin=isUrgent()&&(isRegular ? totalRev<MIN_REV : orderCount<MIN_ORDERS);
-  const activeReminders=getActiveReminders(pilot);
+  const activeReminders=getActiveReminders(pilot, deliveryDay);
   const missing=MIN_ORDERS-orderCount;
   const daysSinceLaunch = pilot.launch ? Math.floor((Date.now()-pilot.launch.getTime())/(24*3600*1000)) : 999;
   const justGraduated = isRegular && daysSinceLaunch < 35;
