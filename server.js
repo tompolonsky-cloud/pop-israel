@@ -316,6 +316,27 @@ app.post('/api/history/upload', (req, res) => {
   res.json({ ok: true, filename: `orders_${dateStr}.csv` });
 });
 
+// ── POST /api/driver-arrival — coordinator saves driver arrival time
+const ARRIVALS_FILE = path.join(__dirname, 'data', 'arrivals.json');
+let arrivals = [];
+try { arrivals = JSON.parse(fs.readFileSync(ARRIVALS_FILE, 'utf-8')); } catch(e) { arrivals = []; }
+
+app.post('/api/driver-arrival', (req, res) => {
+  const { coordKey, coordName, date, time, week } = req.body || {};
+  if (!coordKey || !time) return res.status(400).json({ error: 'missing fields' });
+  const rec = { coordKey, coordName: coordName||coordKey, date: date||new Date().toISOString().slice(0,10), time, week: week||null, savedAt: new Date().toISOString() };
+  // upsert by coordKey+date
+  const idx = arrivals.findIndex(a => a.coordKey===coordKey && a.date===rec.date);
+  if (idx>=0) arrivals[idx] = rec; else arrivals.push(rec);
+  try { fs.writeFileSync(ARRIVALS_FILE, JSON.stringify(arrivals, null, 2)); } catch(e) {}
+  console.log(`🚗 הגעת נהג נשמרה: ${coordKey} ${rec.date} ${time}`);
+  res.json({ ok: true });
+});
+
+app.get('/api/driver-arrival', (req, res) => {
+  res.json(arrivals);
+});
+
 app.listen(PORT, () => {
   console.log(`\n🌿 פופ ישראל — שרת פעיל`);
   console.log(`   פורטל: http://localhost:${PORT}`);
