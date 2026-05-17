@@ -98,6 +98,7 @@ app.post('/api/settings', (req, res) => {
 const COORD_ALIASES = {
   'Miryam-Caspi':      { coordKey: 'מרים-כספי',       coordName: 'מרים כספי' },
   'Sivan-Cohen-Gvili': { coordKey: 'סיון-כהן-גבילי',  coordName: 'סיון כהן' },
+  'טל':               { coordKey: 'טל',               coordName: 'טל ולטר'  },
 };
 function applyAlias(c) {
   const a = COORD_ALIASES[c.coordKey];

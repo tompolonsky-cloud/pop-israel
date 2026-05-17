@@ -559,7 +559,7 @@ function App() {
 
   if(view==="admin") return <AdminScreen coords={coords} times={times} drivers={drivers} waLinks={waLinks} week={week}
       notifs={notifs} progress={progress} updatedAt={updatedAt} memberData={memberData} coordHistory={coordHistory}
-      deliveryDays={deliveryDays} groupNames={groupNames} adminTab={adminTab} onAdminTab={setAdminTab}
+      deliveryDays={deliveryDays} groupNames={groupNames} coordPhones={coordPhones} adminTab={adminTab} onAdminTab={setAdminTab}
       onSaveTimes={saveTimes} onSaveDrivers={saveDrivers} onSaveWaLinks={saveWaLinks} onFireNotif={fireNotif}
       onSaveMemberData={saveMemberData} onSaveDeliveryDays={saveDeliveryDays} onSaveGroupNames={saveGroupNames}
       onCoordLink={copyCoordLink} onCoordWA={sendCoordWA}
@@ -666,7 +666,7 @@ function exportCommissionCSV(month, coords, coordHistory) {
 }
 
 function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedAt,memberData,coordHistory,
-    deliveryDays={},groupNames={},adminTab='overview',onAdminTab,
+    deliveryDays={},groupNames={},coordPhones={},adminTab='overview',onAdminTab,
     onSaveTimes,onSaveDrivers,onSaveWaLinks,onFireNotif,onSaveMemberData,onSaveDeliveryDays,onSaveGroupNames,
     onCoordLink,onCoordWA,onOpenCoord,onUpdateMembers,toast,showToast}) {
   const adTab=adminTab;
@@ -684,11 +684,18 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
   const pilotCoords  = coords.filter(c=>pilotInfo(c.launchDate).status==='pilot');
   const regularCoords= coords.filter(c=>pilotInfo(c.launchDate).status!=='pilot');
 
+  const DAY_ORDER={'א':0,'ב':1,'ג':2,'ד':3,'ה':4,'ו':5,'ש':6};
   const sortedCoords=[...regularCoords].sort((a,b)=>{
     if(sortBy==='alpha') return (a.coordName||'').localeCompare(b.coordName||'','he');
+    if(sortBy==='day') {
+      const da=DAY_ORDER[deliveryDays[a.coordKey]]??9;
+      const db=DAY_ORDER[deliveryDays[b.coordKey]]??9;
+      return da!==db?da-db:(a.coordName||'').localeCompare(b.coordName||'','he');
+    }
     const ra=a.orders.reduce((s,o)=>s+o.total,0);
     const rb=b.orders.reduce((s,o)=>s+o.total,0);
-    return sortBy==='amount-asc'?ra-rb:rb-ra;
+    if(ra!==rb) return sortBy==='amount-asc'?ra-rb:rb-ra;
+    return (a.coordName||'').localeCompare(b.coordName||'','he');
   });
   const filteredCoords=search?coords.filter(c=>c.coordName.includes(search)||(c.city||'').includes(search)):coords;
 
@@ -803,12 +810,16 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
                   <div key={c.coordKey} style={{marginBottom:12,borderBottom:'1px solid #dbeafe',paddingBottom:12}}>
                     <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,cursor:'pointer'}} onClick={()=>onOpenCoord(c)}>
                       <div style={{flex:1,minWidth:0}}>
-                        <span style={{fontWeight:700,fontSize:13}}><CoordName name={c.coordName}/></span>
-                        <span style={{fontSize:11,color:'#6b7280'}}> — {c.city}</span>
+                        <div style={{fontWeight:700,fontSize:13,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+                          <CoordName name={c.coordName}/>
+                          {deliveryDays[c.coordKey]&&<span style={{fontSize:10,fontWeight:700,background:'#fef3c7',color:'#92400e',borderRadius:4,padding:'1px 6px'}}>יום {deliveryDays[c.coordKey]}</span>}
+                        </div>
+                        <span style={{fontSize:11,color:'#6b7280'}}>{c.city}</span>
                       </div>
                       <span style={{fontSize:11,fontWeight:700,background:'#dbeafe',color:'#1d4ed8',
                         borderRadius:20,padding:'2px 8px',flexShrink:0}}>ש{pilot.week}/4</span>
                       {memEntry.count?<span style={{fontSize:11,color:'#6b7280',flexShrink:0}}>👥 {memEntry.count}</span>:null}
+                      {(()=>{const ph=c.coordPhone||coordPhones[c.coordKey]||'';return ph?<button onClick={e=>{e.stopPropagation();window.open(waLink(ph));}} style={{...S.iconBtn,background:'#dcfce7',flexShrink:0}}>💬</button>:null;})()}
                       <button onClick={e=>{e.stopPropagation();onFireNotif(c);}}
                         style={{...S.iconBtn,background:'#1a3c2e',color:'#ffd166',flexShrink:0}}>🔔</button>
                     </div>
@@ -851,7 +862,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10,flexWrap:'wrap',gap:6}}>
               <div style={{display:'flex',alignItems:'center'}}><p style={{...T.cardTitle,margin:0}}>🚦 נקודות קבועות — {regularCoords.length}</p><Tip text="🟢 עמד ביעד (5+ הזמנות / 400+ ₪) · 🟡 קרוב ליעד · 🔴 זקוק לתגבור. לחץ על רכז לפרטים מלאים."/></div>
               <div style={{display:'flex',gap:5}}>
-                {[['amount-asc','₪ ↑'],['amount-desc','₪ ↓'],['alpha','א-ב']].map(([k,l])=>(
+                {[['amount-asc','₪ ↑'],['amount-desc','₪ ↓'],['alpha','א-ב'],['day','📅 יום']].map(([k,l])=>(
                   <button key={k} onClick={()=>setSortBy(k)}
                     style={{padding:'4px 10px',borderRadius:20,border:'none',cursor:'pointer',fontSize:12,fontWeight:700,
                       background:sortBy===k?'#1a3c2e':'#e8ede9',color:sortBy===k?'#ffd166':'#374151'}}>
@@ -890,8 +901,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
                     <div style={{fontSize:13,fontWeight:900,color:'#1a3c2e'}}>{c.orders.length} הז׳</div>
                     <div style={{fontSize:12,color:'#5a7a64',fontWeight:600}}>₪{rev.toLocaleString('he-IL')}</div>
                   </div>
-                  {c.coordPhone&&<button onClick={e=>{e.stopPropagation();window.open(waLink(c.coordPhone));}}
-                    style={{...S.iconBtn,background:'#dcfce7',flexShrink:0}}>💬</button>}
+                  {(()=>{const ph=c.coordPhone||coordPhones[c.coordKey]||'';return ph?<button onClick={e=>{e.stopPropagation();window.open(waLink(ph));}} style={{...S.iconBtn,background:'#dcfce7',flexShrink:0}}>💬</button>:null;})()}
                   <button onClick={e=>{e.stopPropagation();onFireNotif(c);}}
                     style={{...S.iconBtn,background:'#1a3c2e',color:'#ffd166',flexShrink:0}}>🔔</button>
                 </div>
@@ -939,7 +949,19 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
             placeholder="🔍 חיפוש לפי שם או עיר..."
             style={{...S.input,marginBottom:12,fontSize:14}}/>
           <Card>
-            <div style={{display:'flex',alignItems:'center',marginBottom:14}}><p style={{...T.cardTitle,margin:0}}>🔗 לינקים אישיים</p><Tip text="קישורים לקבוצות וואטסאפ של כל רכז. משמשים לפתיחה ישירה ולכפתורי 💬 בסקירה. הדבק את הלינק מקבוצת הוואטסאפ."/></div>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:8}}>
+              <div style={{display:'flex',alignItems:'center'}}><p style={{...T.cardTitle,margin:0}}>🔗 לינקים אישיים</p><Tip text="קישורים לקבוצות וואטסאפ של כל רכז. משמשים לפתיחה ישירה ולכפתורי 💬 בסקירה. הדבק את הלינק מקבוצת הוואטסאפ."/></div>
+              <button style={{...S.btn,fontSize:11,padding:'5px 10px',background:'#25d366'}} onClick={()=>{
+                const filled={...localWaLinks};
+                filteredCoords.forEach(c=>{
+                  if(!filled[c.coordKey]){
+                    const ph=c.coordPhone||coordPhones[c.coordKey]||'';
+                    if(ph) filled[c.coordKey]=`https://wa.me/${ph.replace(/^0/,'972')}`;
+                  }
+                });
+                setLocalWaLinks(filled);
+              }}>🤖 מלא אוטומטי מטלפון</button>
+            </div>
             {filteredCoords.map(c=>{
               const grpLink=localWaLinks[c.coordKey]||"";
               return (
