@@ -404,9 +404,10 @@ function App() {
     const cu = sto_get(K_CUSTOMERS); if(cu) setAllTimeCustomers(cu);
 
     // Fetch server settings (secretary writes here, all portals read)
+    let sv = {};
     try {
       const sr = await fetch('/api/settings');
-      const sv = await sr.json();
+      sv = await sr.json();
       if (sv.times   && Object.keys(sv.times).length)   { setTimes(sv.times);     sto_set(K_TIMES,   sv.times);   }
       if (sv.drivers && Object.keys(sv.drivers).length)  { setDrivers(sv.drivers); sto_set(K_DRIVERS, sv.drivers); }
       if (sv.waLinks && Object.keys(sv.waLinks).length)  { setWaLinks(sv.waLinks); sto_set(K_WALINKS, sv.waLinks); }
