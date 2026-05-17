@@ -2300,10 +2300,7 @@ function MessagesTab({coord,week,pilot,driver,waGroupLink,justGraduated,pilotPas
     isRegularCoord
       ? {title:"🌱 גיוס חברים חדשים", sub:"לשיתוף עם לא-חברים", color:"#166534", text:buildCommunityMsg(coord,waGroupLink)}
       : {title:"🔔 פתיחת חנות",       sub:"לפרסום בקבוצה",       color:"#1a3c2e", text:buildStoreOpen(coord,null,weekLabel)},
-    {title:"🌿 הודעה שבועית",    sub:"שיווק + לינק + קריאה לשתף", color:"#2d6a4f", text:buildGroupAnnounce(coord,null,weekLabel)},
     {title:"🔗 לינק החנות",      sub:"להעתקה ושיתוף",              color:"#52b788", text:storeLink},
-    {title:"💬 שירות לקוחות",   sub:"התכתבות WA בלבד",            color:"#f4a261", text:`שירות לקוחות פופ ישראל 💬\n${fmtPhone(CS_PHONE)}\n\n⚠️ בהתכתבות בוואטסאפ בלבד (לא שיחות)`},
-    {title:"📋 רווית — לוגיסטיקה", sub:"נהג / עיכוב / תיאום",    color:"#e67e22", text:`רווית — מתאמת לוגיסטיקה 🚐\n${fmtPhone(RAVIT_PHONE)}\n\nפונים לרווית רק בנושאים:\n• בעיה עם הנהג\n• עיכוב בחלוקה\n• תיאום מיוחד\n\nבעיות הזמנה ותשלום → שירות לקוחות בלבד.`},
   ];
   if(driver?.phone) msgs.push({title:`🚐 ${driver.name||"הנהג שלך"}`,sub:fmtPhone(driver.phone),color:"#6b7280",text:`הנהג שלך: ${driver.name||""}\n${fmtPhone(driver.phone)} 📞`});
   const graduationMsg = `🎉 *כל הכבוד — השלמנו את הפיילוט!*\n\nחברים, 4 שבועות עברנו ביחד והפכנו לנקודת חלוקה קבועה של פופ ישראל 🌿\n\nתודה לכל אחד ואחת שהזמין, שיתף, ותמך — יחד עשינו את זה! 💚\n\nמעכשיו אנחנו ממשיכים לצמוח יחד, שבוע אחרי שבוע.\n\nמי שעוד לא הזמין — החנות פתוחה כרגיל 👇\n${getStoreLink()}`;
@@ -2325,21 +2322,11 @@ function MessagesTab({coord,week,pilot,driver,waGroupLink,justGraduated,pilotPas
     <div style={{background:"#fffbeb",border:"1.5px solid #fcd34d",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
       <div style={{display:'flex',alignItems:'center',marginBottom:6}}><p style={{fontSize:12,fontWeight:800,color:"#92400e",margin:0}}>📞 למי פונים?</p><Tip text="שירות לקוחות: בעיות הזמנה ותשלום · רווית: נהג / עיכוב / לוגיסטיקה בלבד. בעיות כלליות → שירות לקוחות."/></div>
       <div style={{fontSize:12,color:"#78350f",lineHeight:1.7}}>
-        <div>💬 <strong>שירות לקוחות</strong> — בעיות הזמנה, תשלום, איכות<br/><span style={{opacity:.75,paddingRight:20}}>התכתבות WA בלבד · {fmtPhone(CS_PHONE)}</span></div>
+        <div>💬 <strong>שירות לקוחות</strong> — בעיות הזמנה, תשלום, איכות<br/><span style={{opacity:.75,paddingRight:20}}>התכתבות וואטסאפ בלבד · {fmtPhone(CS_PHONE)}</span></div>
         <div style={{marginTop:6}}>🚐 <strong>רווית</strong> — נהג / עיכוב / תיאום מיוחד<br/><span style={{opacity:.75,paddingRight:20}}>{fmtPhone(RAVIT_PHONE)}</span></div>
       </div>
     </div>
-    {msgs.slice(3).map((m,i)=><CopyCard key={i+3} {...m} showToast={showToast}/>)}
-    <Card>
-      <p style={{...T.cardTitle,marginBottom:10}}>💬 הודעות אישיות ללקוחות</p>
-      {coord.orders.filter(o=>o.phone).slice(0,5).map((o,i)=>(
-        <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #e8ede9"}}>
-          <div style={{flex:1,fontSize:13,fontWeight:600}}>{o.name}</div>
-          <a href={waLink(o.phone, buildPersonalMsg(o,coord))} target="_blank"
-            style={{background:"#25d366",color:"#fff",padding:"6px 12px",borderRadius:8,fontSize:12,fontWeight:700,textDecoration:"none"}}>💬 שלח</a>
-        </div>
-      ))}
-    </Card>
+    {msgs.slice(2).map((m,i)=><CopyCard key={i+2} {...m} showToast={showToast}/>)}
   </>;
 }
 
@@ -2702,13 +2689,20 @@ function RemindersTab({coord,pilot,activeReminders,waGroupLink,history,showToast
       </div>
     ))}
     <Card style={{borderRight:"4px solid #2d6a4f"}}>
-      <p style={{...T.cardTitle,marginBottom:6}}>📅 תזכורת שבועית</p>
+      <p style={{...T.cardTitle,marginBottom:4}}>🔔 תזכורות בדפדפן</p>
+      <p style={{fontSize:12,color:"#6b7280",marginBottom:10,lineHeight:1.6}}>תזכורות שמופיעות על המסך של הטלפון/מחשב הזה בזמנים הנכונים:</p>
+      <div style={{fontSize:12,color:"#374151",lineHeight:1.9,marginBottom:10}}>
+        <div>🗓️ <strong>חמישי–שבת</strong> — הזמן משתתפים חדשים לפני פתיחת החנות</div>
+        <div>🧺 <strong>שני בבוקר</strong> — הזמן סל רכז לפני 14:00</div>
+        <div>🚗 <strong>יום החלוקה בבוקר</strong> — מלא שעת הגעת הנהג</div>
+        {pilot?.status==="pilot"&&<div>💬 <strong>שבוע 2 בפיילוט</strong> — שתף משוב על הסחורה</div>}
+      </div>
       {!notifGranted
         ?<button style={S.btn} onClick={requestNotif}>🔔 אפשר תזכורות</button>
-        :<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-          <button style={{...S.btnSmall,background:"#6b7280",padding:10}} onClick={testNotif}>🧪 בדוק עכשיו</button>
+        :<div style={{display:"flex",gap:8}}>
+          <button style={{...S.btnSmall,background:"#6b7280",padding:10,flex:1}} onClick={testNotif}>🧪 שלח תזכורת ניסיון</button>
         </div>}
-      {notifGranted&&<p style={{fontSize:11,color:"#16a34a",marginTop:10,textAlign:"center"}}>✅ נוטיפיקציות פעילות</p>}
+      {notifGranted&&<p style={{fontSize:11,color:"#16a34a",marginTop:10,textAlign:"center"}}>✅ תזכורות פעילות על המכשיר הזה</p>}
     </Card>
     {pilot?.status==="pilot" && (
       <Card style={{borderRight:"4px solid #f4a261"}}>
