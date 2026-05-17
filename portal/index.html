@@ -1512,7 +1512,7 @@ function ChecklistTab({staleCoords,coords,showToast,week}){
             <div style={{marginTop:10,borderTop:'1px solid #fca5a5',paddingTop:10}}>
               <button onClick={()=>setShowRedMsg(v=>!v)}
                 style={{width:'100%',background:showRedMsg?'#fee2e2':'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,padding:'9px 12px',fontSize:12,fontWeight:700,color:'#991b1b',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                <span style={{display:'flex',alignItems:'center',gap:4}}>📮 שלח הודעה לרכזים ב🔴<Tip text="רכזים שלא עמדו ביעד השבועי (פחות מ-₪500 פיילוט / ₪1,000 קבועות). לחץ 💬 לשליחת הודעת עידוד דרך וואטסאפ."/></span>
+                <span style={{display:'flex',alignItems:'center',gap:4}}>📮 שלח הודעה לרכזים ב🔴<Tip text="רכזים שלא עמדו ביעד השבועי (פחות מ-5 הזמנות בפיילוט / ₪1,000 בנקודה קבועה). לחץ 💬 לשליחת הודעת עידוד דרך וואטסאפ."/></span>
                 <span style={{background:'#dc2626',color:'#fff',borderRadius:12,padding:'1px 8px',fontSize:11}}>{redCoords.length}</span>
               </button>
               {showRedMsg&&(
@@ -1828,8 +1828,9 @@ function CoordScreen({coord,driver,waGroupLink,week,onBack,tab,setTab,toast,show
   const MIN_ORDERS=5;
   const pilot=pilotInfo(coord.launchDate);
   const isRegular=pilot.status==='regular';
-  const MIN_REV=isRegular?1000:500;
-  const belowMin=isUrgent()&&totalRev<MIN_REV;
+  const MIN_REV=1000;
+  const ASPIRE_REV=2500;
+  const belowMin=isUrgent()&&(isRegular ? totalRev<MIN_REV : orderCount<MIN_ORDERS);
   const activeReminders=getActiveReminders(pilot, deliveryDay);
   const missing=MIN_ORDERS-orderCount;
   const daysSinceLaunch = pilot.launch ? Math.floor((Date.now()-pilot.launch.getTime())/(24*3600*1000)) : 999;
@@ -1859,8 +1860,12 @@ function CoordScreen({coord,driver,waGroupLink,week,onBack,tab,setTab,toast,show
     }
   },[]);
 
-  const boostMsg=`חברים, הגענו ל-₪${totalRev.toLocaleString('he-IL')} השבוע — אנחנו צריכים לפחות ₪${MIN_REV} כדי שהחלוקה תגיע! 🥺\n\nמי שעוד לא הזמין — זה הרגע! ⏰\n${getStoreLink()}\n\nומי שיכול להמליץ לשכן/ה — תעשו טוב 🙏\nיחד נגיע ליעד! 🌿`;
-  const personalBoostMsg=`חברים, הזמנו ${orderCount} מזמינים השבוע 🌿\n\nחסרים לנו ₪${Math.max(0,MIN_REV-totalRev).toLocaleString('he-IL')} בלבד להגיע לסף החלוקה — כמעט שם!\nמי שעוד לא הזמין — זה הרגע ⏰\n${getStoreLink()}\n\nתודה 💚`;
+  const boostMsg=isRegular
+    ?`חברים, הגענו ל-₪${totalRev.toLocaleString('he-IL')} השבוע — אנחנו צריכים לפחות ₪${MIN_REV} כדי שהחלוקה תגיע! 🥺\n\nמי שעוד לא הזמין — זה הרגע! ⏰\n${getStoreLink()}\n\nומי שיכול להמליץ לשכן/ה — תעשו טוב 🙏\nיחד נגיע ליעד! 🌿`
+    :`חברים, יש לנו ${orderCount} הזמנות השבוע — אנחנו צריכים לפחות ${MIN_ORDERS} כדי שהחלוקה תגיע אלינו! 🥺\n\nמי שעוד לא הזמין — זה הרגע! ⏰\n${getStoreLink()}\n\nומי שיכול להמליץ לשכן/ה — תעשו טוב 🙏\nיחד נגיע ליעד! 🌿`;
+  const personalBoostMsg=isRegular
+    ?`חברים, הזמנו ${orderCount} מזמינים השבוע 🌿\n\nחסרים לנו ₪${Math.max(0,MIN_REV-totalRev).toLocaleString('he-IL')} בלבד להגיע לסף החלוקה — כמעט שם!\nמי שעוד לא הזמין — זה הרגע ⏰\n${getStoreLink()}\n\nתודה 💚`
+    :`חברים, הזמנו ${orderCount} מזמינים השבוע 🌿\n\nצריכים עוד ${Math.max(0,MIN_ORDERS-orderCount)} בלבד להגיע ל-${MIN_ORDERS} — כמעט שם!\nמי שעוד לא הזמין — זה הרגע ⏰\n${getStoreLink()}\n\nתודה 💚`;
 
   return (
     <Screen>
@@ -1960,10 +1965,11 @@ function CoordScreen({coord,driver,waGroupLink,week,onBack,tab,setTab,toast,show
           {isRegular ? (<>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:10,opacity:.75,marginBottom:4}}>
               <span>הכנסות שבועיות{beatRevenue&&<span style={{color:"#ffd166",fontWeight:900}}> 🔥 שיא!</span>}</span>
-              <span>₪{totalRev.toLocaleString('he-IL')} / ₪{MIN_REV} מינימום</span>
+              <span>₪{totalRev.toLocaleString('he-IL')} · מינימום ₪{MIN_REV.toLocaleString()} · שאיפה ₪{ASPIRE_REV.toLocaleString()}</span>
             </div>
-            <div style={{background:"rgba(255,255,255,.2)",borderRadius:99,height:8}}>
-              <div style={{width:Math.min(100,(totalRev/MIN_REV)*100)+"%",height:"100%",background:belowMin?"#fca5a5":"#86efac",borderRadius:99,transition:"width .5s"}}/>
+            <div style={{position:"relative",background:"rgba(255,255,255,.2)",borderRadius:99,height:8}}>
+              <div style={{width:Math.min(100,(totalRev/ASPIRE_REV)*100)+"%",height:"100%",background:totalRev<MIN_REV?"#fca5a5":totalRev<ASPIRE_REV?"#fde68a":"#86efac",borderRadius:99,transition:"width .5s"}}/>
+              <div style={{position:"absolute",left:(MIN_REV/ASPIRE_REV*100)+"%",top:-2,width:2,height:12,background:"rgba(255,255,255,.6)",borderRadius:1}}/>
             </div>
             {lastWeek&&<div style={{fontSize:10,opacity:.55,marginTop:3}}>שבוע שעבר: ₪{lastWeek.revenue.toLocaleString('he-IL')} · {lastWeek.orders} הזמנות</div>}
           </>) : (<>
@@ -1983,7 +1989,10 @@ function CoordScreen({coord,driver,waGroupLink,week,onBack,tab,setTab,toast,show
         <div style={{background:"#fef2f2",border:"1.5px solid #fca5a5",margin:"12px 14px 0",borderRadius:12,padding:"14px"}}>
           <p style={{fontSize:14,fontWeight:800,color:"#991b1b",marginBottom:6}}>⚠️ סכנה — החלוקה עלולה לא להגיע!</p>
           <p style={{fontSize:12,color:"#7f1d1d",lineHeight:1.6,marginBottom:10}}>
-            <>הגעת ל-₪{totalRev.toLocaleString('he-IL')}. צריך לפחות ₪{MIN_REV}.<br/><strong>שלח/י הודעה לקבוצה:</strong></>
+            {isRegular
+              ?<>הגעת ל-₪{totalRev.toLocaleString('he-IL')}. צריך לפחות ₪{MIN_REV}.<br/><strong>שלח/י הודעה לקבוצה:</strong></>
+              :<>יש לך {orderCount} הזמנות. צריך לפחות {MIN_ORDERS}.<br/><strong>שלח/י הודעה לקבוצה:</strong></>
+            }
           </p>
           <div style={{display:'flex',gap:8,marginBottom:8,flexWrap:'wrap'}}>
             <CopyBtnSimple text={boostMsg} label="📋 הודעת דחיפה"/>
@@ -2663,7 +2672,7 @@ const COORD_GUIDE_SECTIONS = [
     id:"orders-guide", icon:"📋", title:"ניהול הזמנות וחלוקה",
     items:[
       {h:"איך רואים הזמנות?", b:"לשונית 📋 מציגה את כל ההזמנות לשבוע הנוכחי — שם, סכום, 🆕 חדש / 🔄 חוזר. לחץ על הזמנה לפירוט פריטים."},
-      {h:"מינימום לחלוקה", b:"₪500 לנקודות פיילוט, ₪1,000 לנקודות קבועות. אם מתחת לסף — תקבל/י התראה אדומה."},
+      {h:"מינימום לחלוקה", b:"פיילוט: 5 מזמינים. נקודה קבועה: ₪1,000 (שאיפה ₪2,500). אם מתחת לסף — תקבל/י התראה אדומה."},
       {h:"מה עושים אם חסרות הזמנות?", b:"בלשונית 📋 — שלח הודעת דחיפה לקבוצה, ובדוק את כרטיס 'לא הזמינו השבוע' לשליחת הודעה אישית ללקוחות שנעלמו."},
       {h:"ספירה לאחור לסגירה", b:"בראש לשונית 📋 יש שעון שמציג כמה זמן נשאר עד סגירת ההזמנות. ברירת מחדל: חמישי 8:00."},
       {h:"הנהג הגיע — הודעה לקבוצה", b:"בלשונית 📋 — כרטיס 'הנהג הגיע' 🚗\n1. מלא את שעת הגעת הנהג\n2. לחץ 'הכן ועתק הודעה לקבוצה'\n3. הדבק בקבוצת הוואטסאפ\nההודעה כוללת את שמות כל המזמינים ומיקום האיסוף."},
