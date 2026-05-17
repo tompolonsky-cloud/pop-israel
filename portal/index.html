@@ -125,16 +125,6 @@ ${name}${phone ? " " + phone : ""}
 ${link}`;
 }
 
-const FAQ = [
-  { q:"מתי מגיעה ההזמנה?",         a:"החלוקה בנקודת האיסוף שלך בשעה הקבועה. תקבל תזכורת מהרכז/ת יום לפני." },
-  { q:"איך מבטלים הזמנה?",          a:"ניתן לבטל עד יום ראשון בחצות בשבוע שלפני. פנה/י לרכז/ת שלך." },
-  { q:"מה אם פספסתי את החלוקה?",    a:"צור/י קשר עם הרכז/ת ישירות — לרוב אפשר לסדר איסוף חלופי." },
-  { q:"איך משלמים?",                 a:"ביט / העברה בנקאית / מזומן — לפי הסיכום עם הרכז/ת שלך." },
-  { q:"מה כלול בהזמנה?",            a:"ירקות עונתיים טריים ישירות מהחקלאי. הפירוט המדויק בחנות." },
-  { q:"יש מינימום הזמנה?",          a:"לא. ניתן להזמין כל כמות." },
-  { q:"איך מוסיפים חברים לקבוצה?", a:"שתף/י את לינק החנות — ברגע שמזמינים, הם נכנסים לקבוצה." },
-  { q:"מה אם המוצר לא תקין?",      a:"פנה/י לרכז/ת עם תמונה. פופ מטפלת ומחזירה כסף או מוצר." },
-];
 
 // ══════════════════════════════════════════════
 // STORAGE — localStorage
@@ -2020,7 +2010,7 @@ function CoordScreen({coord,driver,waGroupLink,week,onBack,tab,setTab,toast,show
         {tab==="customers" && <ErrorBoundary><CustomersTab allCustomers={allCustomers} week={week} showToast={showToast}/></ErrorBoundary>}
         {tab==="messages"  && <ErrorBoundary><MessagesTab coord={coord} week={week} pilot={pilot} driver={driver} waGroupLink={waGroupLink} justGraduated={justGraduated} pilotPassed={pilotPassed} beatLastWeek={beatLastWeek} beatOrders={beatOrders} beatRevenue={beatRevenue} lastWeek={lastWeek} orderCount={orderCount} totalRev={totalRev} hitMemberTarget={hitMemberTarget} memberEntry={memberEntry} showToast={showToast}/></ErrorBoundary>}
         {tab==="reminders" && <ErrorBoundary><RemindersTab coord={coord} pilot={pilot} activeReminders={activeReminders} waGroupLink={waGroupLink} history={history} showToast={showToast}/></ErrorBoundary>}
-        {tab==="faq"       && <FaqTab/>}
+        {tab==="faq"       && <FaqTab coord={coord} week={week}/>}
       </Body>
       <Toast msg={toast}/>
     </Screen>
@@ -2707,8 +2697,40 @@ const COORD_GUIDE_SECTIONS = [
   },
 ];
 
-function FaqTab() {
+function FaqTab({coord, week}) {
   const [open,setOpen]=useState(null);
+  const storeLink = getStoreLink();
+
+  // מצא שעת הגעת נהג מהשבוע שעבר (מה-localStorage)
+  const lastArrivalTime = (() => {
+    if (!coord?.coordKey) return null;
+    const today = new Date();
+    for (let i = 1; i <= 8; i++) {
+      const d = new Date(today); d.setDate(today.getDate() - i);
+      const t = localStorage.getItem(`pop_drv_${coord.coordKey}_${d.toISOString().slice(0,10)}`);
+      if (t) return t;
+    }
+    return null;
+  })();
+
+  const FAQ = [
+    { q:"מתי מגיעה ההזמנה?",
+      a:`החלוקה בנקודת האיסוף שלך — הרכז/ת ישלח/תשלח הודעה לקבוצה כשהנהג הגיע.${lastArrivalTime?`\nלדוגמא, שבוע שעבר הגיע הנהג ב-${lastArrivalTime}.`:""}` },
+    { q:"איך מבטלים הזמנה?",
+      a:`פונים לשירות לקוחות בוואטסאפ:\n${fmtPhone(CS_PHONE)}\n\nניתן לבטל עד יום חמישי 8:00 של השבוע הנוכחי.` },
+    { q:"מה אם פספסתי את החלוקה?",
+      a:"צור/י קשר עם הרכז/ת ישירות — לרוב אפשר לסדר איסוף חלופי." },
+    { q:"איך משלמים?",
+      a:"באתר בלבד, באשראי בזמן ביצוע ההזמנה." },
+    { q:"מה כלול בהזמנה?",
+      a:"ירקות ופירות עונתיים טריים ישירות מהחקלאי, לצד מוצרים נוספים כמו ביצים, גבינות, שמן זית, לחם מחמצת ועוד. הפירוט המדויק וההרכב משתנה בין שבועות — הכל מצוין בחנות." },
+    { q:"יש מינימום הזמנה?",
+      a:"לא. ניתן להזמין כל כמות." },
+    { q:"איך מוסיפים חברים לקבוצה?",
+      a:`שתף/י את לינק החנות עם שכנים וחברים — ברגע שמזמינים, הם מצטרפים לנקודת החלוקה שלך:\n${storeLink}` },
+    { q:"מה אם המוצר לא תקין?",
+      a:`אין לפנות לרכז/ת — פונים ישירות לשירות לקוחות בוואטסאפ עם תמונה:\n${fmtPhone(CS_PHONE)}\n\nפופ תטפל ותחזיר כסף או מוצר.` },
+  ];
   return (
     <div>
       {COORD_GUIDE_SECTIONS.map(sec=>(
