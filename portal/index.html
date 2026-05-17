@@ -69,6 +69,32 @@ function getStoreLink() {
   return new Date().getDay() === 3 ? STORE_LINK_WED : STORE_LINK_DEFAULT;
 }
 
+function buildCommunityMsg(coord, waGroupLink) {
+  const city  = coord.city || "האזור שלנו";
+  const name  = coord.coordName || "";
+  const phone = fmtPhone(coord.coordPhone || "");
+  const link  = waGroupLink || "";
+  const addr  = coord.deliveryStr ? coord.deliveryStr.split(" - ")[1] || city : city;
+  return `קהילת פופ ${city} 🌱
+
+יחד בוחרים מקומי, תומכים בחקלאים והיצרנים מהעוטף והצפון, ומחזירים טריות אמיתית הביתה.
+
+מה מחכה לכם:
+* ירקות ופירות שנקטפים ממש לפני שמגיעים אליכם
+* מגוון גדול - מעל 300 מוצרים שונים שמתחדשים ברמה שבועית
+* מחירים הוגנים, ללא פערי תיווך וללא רשתות באמצע
+* מוצרים ישראליים איכותיים – לחמים, שמנים, ממרחים ועוד
+* חיזוק הכלכלה המקומית מתוך ערבות הדדית ואהבה לאדמה 🇮🇱
+
+והכי כיף? אין דמי משלוח ואין מינימום הזמנה.
+פשוט להזמין, לקבל טרי — ולהיות חלק ממשהו גדול.
+
+הזמנות מהחנות הדיגיטלית: ימי ראשון ב-19:00 ועד חמישי ב-8:00
+${addr}
+${name}${phone ? " " + phone : ""}
+${link ? `\nלעדכונים הרשמו לקבוצת העדכונים השקטה בוואטסאפ:\n\n${link}` : ""}`;
+}
+
 function buildPilotMsg(coord, waGroupLink) {
   const city  = coord.city || "האזור שלנו";
   const name  = coord.coordName || "";
@@ -2269,8 +2295,11 @@ function CustomersTab({allCustomers, week, showToast}) {
 function MessagesTab({coord,week,pilot,driver,waGroupLink,justGraduated,pilotPassed,beatLastWeek,beatOrders,beatRevenue,lastWeek,orderCount,totalRev,hitMemberTarget,memberEntry,showToast}) {
   const storeLink=getStoreLink();
   const weekLabel = pilot?.status==="pilot" ? `פיילוט שבוע ${pilot.week}/4` : `שבוע ${week?.num||1}`;
+  const isRegularCoord = pilot?.status === 'regular';
   const msgs=[
-    {title:"🔔 פתיחת חנות",      sub:"לפרסום בקבוצה",              color:"#1a3c2e", text:buildStoreOpen(coord,null,weekLabel)},
+    isRegularCoord
+      ? {title:"🌱 גיוס חברים חדשים", sub:"לשיתוף עם לא-חברים", color:"#166534", text:buildCommunityMsg(coord,waGroupLink)}
+      : {title:"🔔 פתיחת חנות",       sub:"לפרסום בקבוצה",       color:"#1a3c2e", text:buildStoreOpen(coord,null,weekLabel)},
     {title:"🌿 הודעה שבועית",    sub:"שיווק + לינק + קריאה לשתף", color:"#2d6a4f", text:buildGroupAnnounce(coord,null,weekLabel)},
     {title:"🔗 לינק החנות",      sub:"להעתקה ושיתוף",              color:"#52b788", text:storeLink},
     {title:"💬 שירות לקוחות",   sub:"התכתבות WA בלבד",            color:"#f4a261", text:`שירות לקוחות פופ ישראל 💬\n${fmtPhone(CS_PHONE)}\n\n⚠️ בהתכתבות בוואטסאפ בלבד (לא שיחות)`},
