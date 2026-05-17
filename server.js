@@ -49,6 +49,17 @@ if (fs.existsSync(COORD_FILE)) {
   try { coordList = readJSON(COORD_FILE); } catch(e) {}
 }
 
+// תרגום שמות לטיניים → עברית (coordKey + coordName) — מוגדר לפני המיגרציה!
+const COORD_ALIASES = {
+  'Miryam-Caspi':      { coordKey: 'מרים-כספי',       coordName: 'מרים כספי' },
+  'Sivan-Cohen-Gvili': { coordKey: 'סיון-כהן-גבילי',  coordName: 'סיון כהן' },
+  'טל':               { coordKey: 'טל',               coordName: 'טל ולטר'  },
+};
+function applyAlias(c) {
+  const a = COORD_ALIASES[c.coordKey];
+  return a ? { ...c, ...a } : c;
+}
+
 let settings = { times: {}, drivers: {}, waLinks: {}, week: { num: 1, label: 'שבוע 1', openedAt: null } };
 if (fs.existsSync(SETTINGS_FILE)) {
   try { settings = { ...settings, ...JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8')) }; } catch(e) {}
@@ -93,17 +104,6 @@ app.post('/api/settings', (req, res) => {
   console.log(`⚙️  הגדרות עודכנו`);
   res.json({ ok: true });
 });
-
-// תרגום שמות לטיניים → עברית (coordKey + coordName)
-const COORD_ALIASES = {
-  'Miryam-Caspi':      { coordKey: 'מרים-כספי',       coordName: 'מרים כספי' },
-  'Sivan-Cohen-Gvili': { coordKey: 'סיון-כהן-גבילי',  coordName: 'סיון כהן' },
-  'טל':               { coordKey: 'טל',               coordName: 'טל ולטר'  },
-};
-function applyAlias(c) {
-  const a = COORD_ALIASES[c.coordKey];
-  return a ? { ...c, ...a } : c;
-}
 
 // רכזים שהוסרו ידנית — לא יחזרו גם אם הגיליון מכיל אותם
 const COORD_BLOCKLIST = new Set([
