@@ -61,6 +61,13 @@ async function main() {
 
     if (!csv || csv.length < 50) throw new Error('CSV ריק');
 
+    // שמירת snapshot היסטורי
+    const histDir = path.join(__dirname, 'data', 'history');
+    if (!fs.existsSync(histDir)) fs.mkdirSync(histDir, { recursive: true });
+    const dateStr = new Date().toISOString().slice(0, 10);
+    fs.writeFileSync(path.join(histDir, `orders_${dateStr}.csv`), csv);
+    console.log(`   📁 נשמר snapshot: orders_${dateStr}.csv`);
+
     // שליפת רשימת רכזים מהגיליון — הדפדפן כבר מחובר ל-Google
     let sheetCsv = null;
     try {

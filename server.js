@@ -270,6 +270,52 @@ app.post('/api/update', (req, res) => {
   res.json({ ok: true, coordCount: coords.length });
 });
 
+// ══════════════════════════════════════════════
+// History — /api/history
+// ══════════════════════════════════════════════
+const HISTORY_DIR = path.join(__dirname, 'data', 'history');
+fs.mkdirSync(HISTORY_DIR, { recursive: true });
+
+// רשימת קבצים היסטוריים
+app.get('/api/history', (req, res) => {
+  try {
+    const files = fs.readdirSync(HISTORY_DIR)
+      .filter(f => /^orders_\d{4}-\d{2}-\d{2}\.csv$/.test(f))
+      .sort().reverse()
+      .map(f => {
+        const stat = fs.statSync(path.join(HISTORY_DIR, f));
+        const dateStr = f.replace('orders_', '').replace('.csv', '');
+        return { filename: f, date: dateStr, size: stat.size };
+      });
+    res.json({ files });
+  } catch(e) {
+    res.json({ files: [] });
+  }
+});
+
+// הורדת קובץ ספציפי
+app.get('/api/history/:filename', (req, res) => {
+  const fn = path.basename(req.params.filename);
+  if (!/^orders_\d{4}-\d{2}-\d{2}\.csv$/.test(fn)) return res.status(400).json({ error: 'invalid' });
+  const fp = path.join(HISTORY_DIR, fn);
+  if (!fs.existsSync(fp)) return res.status(404).json({ error: 'not found' });
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${fn}"`);
+  res.sendFile(fp);
+});
+
+// העלאת CSV ידנית (מהאדמין)
+app.post('/api/history/upload', (req, res) => {
+  const csv = typeof req.body === 'string' ? req.body : null;
+  if (!csv || csv.length < 50) return res.status(400).json({ error: 'empty csv' });
+  const dateStr = (req.query.date || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return res.status(400).json({ error: 'invalid date — use YYYY-MM-DD' });
+  const fp = path.join(HISTORY_DIR, `orders_${dateStr}.csv`);
+  fs.writeFileSync(fp, csv);
+  console.log(`📁 היסטוריה הועלתה ידנית: orders_${dateStr}.csv (${csv.length} bytes)`);
+  res.json({ ok: true, filename: `orders_${dateStr}.csv` });
+});
+
 app.listen(PORT, () => {
   console.log(`\n🌿 פופ ישראל — שרת פעיל`);
   console.log(`   פורטל: http://localhost:${PORT}`);

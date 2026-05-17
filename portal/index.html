@@ -35,6 +35,27 @@ if ('serviceWorker' in navigator) {
 <script type="text/babel">
 const { useState, useEffect } = React;
 
+class ErrorBoundary extends React.Component {
+  constructor(p){super(p);this.state={err:null};}
+  static getDerivedStateFromError(e){return{err:e};}
+  componentDidCatch(e,info){console.error('💥 Tab crash:',e,info);}
+  render(){
+    if(this.state.err) return (
+      <div style={{padding:'24px 16px',background:'#fef2f2',border:'1.5px solid #fca5a5',borderRadius:12,margin:12}}>
+        <div style={{fontSize:15,fontWeight:800,color:'#991b1b',marginBottom:8}}>⚠️ שגיאה בטעינת הלשונית</div>
+        <div style={{fontSize:12,color:'#7f1d1d',fontFamily:'monospace',background:'#fff',padding:'8px 10px',borderRadius:8,wordBreak:'break-all'}}>
+          {this.state.err.message}
+        </div>
+        <button onClick={()=>this.setState({err:null})}
+          style={{marginTop:12,padding:'8px 16px',background:'#b91c1c',color:'#fff',border:'none',borderRadius:8,fontFamily:'Heebo,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+          🔄 נסה שוב
+        </button>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
 // ══════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════
@@ -415,18 +436,22 @@ function App() {
         // enrich coords with stored phones as fallback
         const enriched = merged.map(c => ({...c, coordPhone: c.coordPhone || updatedPh[c.coordKey] || ''}));
         setCoords(enriched);
-        // accumulate all-time customers: phone → {name, phone}; name-only → {name}
+        // accumulate all-time customers: phone → {name, phone, weeks:[]}; name-only → {name, weeks:[]}
+        const weekNum = sv.week?.num || week?.num || 0;
         const storedCust = sto_get(K_CUSTOMERS) || {};
         const updatedCust = JSON.parse(JSON.stringify(storedCust)); // deep clone
         enriched.forEach(c => {
           if (!updatedCust[c.coordKey]) updatedCust[c.coordKey] = {};
           c.orders.forEach(o => {
+            const key = o.phone ? o.phone : 'n_' + (o.name||'').trim();
+            if (!key || key === 'n_') return;
+            const ex = updatedCust[c.coordKey][key] || {};
+            const weeks = Array.isArray(ex.weeks) ? [...ex.weeks] : [];
+            if (weekNum && !weeks.includes(weekNum)) weeks.push(weekNum);
             if (o.phone) {
-              // if same phone exists keep the latest name
-              updatedCust[c.coordKey][o.phone] = { name: o.name || updatedCust[c.coordKey][o.phone]?.name || '', phone: o.phone };
+              updatedCust[c.coordKey][key] = { name: o.name || ex.name || '', phone: o.phone, weeks };
             } else if (o.name) {
-              const k = 'n_' + o.name.trim();
-              if (!updatedCust[c.coordKey][k]) updatedCust[c.coordKey][k] = { name: o.name.trim(), phone: '' };
+              updatedCust[c.coordKey][key] = { name: o.name.trim(), phone: '', weeks };
             }
           });
         });
@@ -671,7 +696,7 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
       </GreenHeader>
 
       <div style={{background:"#1a3c2e",display:"flex",borderBottom:"2px solid #2d6a4f",overflowX:"auto"}}>
-        {[["checklist","✅"],["overview","📊"],["coords","🔗"],["members","👥"],["drivers","🚐"],["guide","📖"]].map(([k,l])=>(
+        {[["checklist","✅"],["overview","📊"],["coords","🔗"],["members","👥"],["drivers","🚐"],["history","🕐"],["guide","📖"]].map(([k,l])=>(
           <div key={k} onClick={()=>setAdTab(k)} style={{flex:"0 0 auto",padding:"10px 14px",textAlign:"center",fontSize:18,color:adTab===k?"#ffd166":"rgba(255,255,255,.45)",borderBottom:adTab===k?"2px solid #ffd166":"2px solid transparent",cursor:"pointer",marginBottom:-2}}>
             {l}
           </div>
@@ -1031,6 +1056,8 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
             <button style={{...S.btn,marginTop:14}} onClick={()=>onSaveDrivers(localDrivers)}>💾 שמור נהגים</button>
           </Card>
         </>}
+
+        {adTab==="history" && <HistoryTab showToast={showToast}/>}
 
         {adTab==="guide" && <AdminGuide/>}
 
@@ -1953,10 +1980,10 @@ function CoordScreen({coord,driver,waGroupLink,week,onBack,tab,setTab,toast,show
         ))}
       </div>
       <Body>
-        {tab==="orders"    && <OrdersTab coord={coord} showToast={showToast} deliveryDay={deliveryDay} week={week}/>}
-        {tab==="customers" && <CustomersTab allCustomers={allCustomers} showToast={showToast}/>}
-        {tab==="messages"  && <MessagesTab coord={coord} week={week} pilot={pilot} driver={driver} waGroupLink={waGroupLink} justGraduated={justGraduated} pilotPassed={pilotPassed} beatLastWeek={beatLastWeek} beatOrders={beatOrders} beatRevenue={beatRevenue} lastWeek={lastWeek} orderCount={orderCount} totalRev={totalRev} hitMemberTarget={hitMemberTarget} memberEntry={memberEntry} showToast={showToast}/>}
-        {tab==="reminders" && <RemindersTab coord={coord} pilot={pilot} activeReminders={activeReminders} waGroupLink={waGroupLink} history={history} showToast={showToast}/>}
+        {tab==="orders"    && <ErrorBoundary><OrdersTab coord={coord} showToast={showToast} deliveryDay={deliveryDay} week={week}/></ErrorBoundary>}
+        {tab==="customers" && <ErrorBoundary><CustomersTab allCustomers={allCustomers} week={week} showToast={showToast}/></ErrorBoundary>}
+        {tab==="messages"  && <ErrorBoundary><MessagesTab coord={coord} week={week} pilot={pilot} driver={driver} waGroupLink={waGroupLink} justGraduated={justGraduated} pilotPassed={pilotPassed} beatLastWeek={beatLastWeek} beatOrders={beatOrders} beatRevenue={beatRevenue} lastWeek={lastWeek} orderCount={orderCount} totalRev={totalRev} hitMemberTarget={hitMemberTarget} memberEntry={memberEntry} showToast={showToast}/></ErrorBoundary>}
+        {tab==="reminders" && <ErrorBoundary><RemindersTab coord={coord} pilot={pilot} activeReminders={activeReminders} waGroupLink={waGroupLink} history={history} showToast={showToast}/></ErrorBoundary>}
         {tab==="faq"       && <FaqTab/>}
       </Body>
       <Toast msg={toast}/>
@@ -2090,50 +2117,147 @@ function OrdersTab({coord,showToast,deliveryDay=null,week}) {
   </>;
 }
 
-function CustomersTab({allCustomers, showToast}) {
+function calcStreak(weeks, currentWeek) {
+  if (!weeks || weeks.length === 0) return 0;
+  const sorted = [...weeks].sort((a,b)=>a-b);
+  const last = sorted[sorted.length-1];
+  // streak only counts if customer ordered this week
+  if (currentWeek && last !== currentWeek) return 0;
+  let streak = 1;
+  for (let i = sorted.length-2; i >= 0; i--) {
+    if (sorted[i] === sorted[i+1]-1) streak++;
+    else break;
+  }
+  return streak;
+}
+
+function CustomersTab({allCustomers, week, showToast}) {
   const [search, setSearch] = useState('');
-  const list = Object.values(allCustomers)
-    .sort((a,b) => (a.name||'').localeCompare(b.name||'', 'he'));
+  const [sortBy, setSortBy] = useState('alpha'); // alpha | count | streak
+  const currentWeek = week?.num || 0;
+
+  const list = Object.values(allCustomers).map(c => ({
+    ...c,
+    count:  (c.weeks||[]).length || 1,
+    streak: calcStreak(c.weeks, currentWeek),
+  }));
+
+  const sorted = [...list].sort((a,b) => {
+    if (sortBy==='count')  return b.count - a.count;
+    if (sortBy==='streak') return b.streak - a.streak || b.count - a.count;
+    return (a.name||'').localeCompare(b.name||'', 'he');
+  });
+
   const filtered = search.trim()
-    ? list.filter(c => (c.name||'').includes(search) || (c.phone||'').includes(search))
-    : list;
-  const withPhone = list.filter(c => c.phone).length;
+    ? sorted.filter(c => (c.name||'').includes(search) || (c.phone||'').includes(search))
+    : sorted;
+
+  const withPhone   = list.filter(c => c.phone).length;
+  const activeNow   = list.filter(c => c.streak > 0).length;  // ordered this week
+  const loyal       = list.filter(c => c.count >= 3).length;  // 3+ weeks
 
   function copyAll() {
-    const lines = list.map((c,i) => `${i+1}. ${c.name||'—'}${c.phone ? ' — ' + fmtPhone(c.phone) : ''}`);
-    navigator.clipboard.writeText(lines.join('\n'))
-      .then(() => showToast('✅ הרשימה הועתקה'));
+    const lines = sorted.map((c,i) => `${i+1}. ${c.name||'—'}${c.phone?' — '+fmtPhone(c.phone):''} (${c.count}×${c.streak>=2?` 🔥${c.streak}`:''})`);
+    navigator.clipboard.writeText(lines.join('\n')).then(() => showToast('✅ הרשימה הועתקה'));
   }
+
+  const SortBtn = ({k,label}) => (
+    <button onClick={()=>setSortBy(k)}
+      style={{padding:'5px 10px',borderRadius:8,border:'none',fontSize:11,fontWeight:700,cursor:'pointer',
+        background:sortBy===k?'#2d6a4f':'#f3f4f6',color:sortBy===k?'#fff':'#6b7280'}}>
+      {label}
+    </button>
+  );
 
   return (
     <Card>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-        <div style={{display:'flex',alignItems:'center'}}><p style={{...T.cardTitle,margin:0}}>👥 לקוחות מכל הזמנים</p><Tip text="כל הלקוחות שהזמינו אצלך אי פעם — נצבר אוטומטית שבוע אחר שבוע. לחץ 💬 לפתיחת וואטסאפ ישירות."/></div>
-        <span style={{fontSize:12,color:'#6b7280',fontWeight:700}}>{list.length} לקוחות · {withPhone} עם טלפון</span>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+        <div style={{display:'flex',alignItems:'center',gap:4}}>
+          <p style={{...T.cardTitle,margin:0}}>👥 לקוחות מכל הזמנים</p>
+          <Tip text="כל הלקוחות שהזמינו אצלך אי פעם — נצבר שבוע אחר שבוע. '×' = כמה שבועות הזמינו. 🔥 = ברצף רצוף עד השבוע הנוכחי."/>
+        </div>
+        <span style={{fontSize:11,color:'#6b7280',fontWeight:700}}>{list.length} סה"כ</span>
       </div>
+
+      {/* ── סטטיסטיקות מהירות ── */}
+      {list.length > 0 && (
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:10}}>
+          {[
+            {label:'הזמינו השבוע', val:activeNow,  color:'#16a34a'},
+            {label:'נאמנים (3+)',   val:loyal,       color:'#7c3aed'},
+            {label:'עם טלפון',     val:withPhone,   color:'#0891b2'},
+          ].map(({label,val,color})=>(
+            <div key={label} style={{background:'#f9fafb',borderRadius:8,padding:'7px 8px',textAlign:'center'}}>
+              <div style={{fontSize:16,fontWeight:900,color}}>{val}</div>
+              <div style={{fontSize:9,color:'#9ca3af',marginTop:1}}>{label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {list.length === 0 ? (
         <div style={{textAlign:'center',color:'#9ca3af',fontSize:13,padding:'24px 0'}}>אין נתונים עדיין — ייאסף אוטומטית מהשבוע הנוכחי</div>
       ) : (<>
         <input
           value={search} onChange={e=>setSearch(e.target.value)}
           placeholder="🔍 חיפוש לפי שם או טלפון..."
-          style={{width:'100%',boxSizing:'border-box',border:'1px solid #d1fae5',borderRadius:10,padding:'9px 12px',fontSize:13,marginBottom:10,outline:'none'}}
+          style={{width:'100%',boxSizing:'border-box',border:'1px solid #d1fae5',borderRadius:10,padding:'9px 12px',fontSize:13,marginBottom:8,outline:'none'}}
         />
-        {filtered.map((c,i) => (
-          <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 0',borderBottom:i<filtered.length-1?'1px solid #f0f4f1':'none'}}>
-            <div style={{width:26,height:26,borderRadius:'50%',background:'#d1fae5',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:900,color:'#2d6a4f',flexShrink:0}}>
-              {(c.name||'?')[0]}
+
+        {/* ── מיון ── */}
+        <div style={{display:'flex',gap:6,marginBottom:10}}>
+          <SortBtn k="alpha"  label="א–ת"/>
+          <SortBtn k="count"  label="🏆 הכי נאמן"/>
+          <SortBtn k="streak" label="🔥 רצף"/>
+        </div>
+
+        {filtered.map((c,i) => {
+          const streakActive = c.streak >= 2;
+          const isLoyal = c.count >= 3;
+          return (
+            <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 0',borderBottom:i<filtered.length-1?'1px solid #f0f4f1':'none'}}>
+              {/* אות ראשונה */}
+              <div style={{width:28,height:28,borderRadius:'50%',
+                background: streakActive?'#fef3c7': isLoyal?'#ede9fe':'#d1fae5',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:11,fontWeight:900,
+                color: streakActive?'#92400e': isLoyal?'#6d28d9':'#2d6a4f',
+                flexShrink:0}}>
+                {(c.name||'?')[0]}
+              </div>
+
+              {/* שם + טלפון */}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:700,fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name||'—'}</div>
+                <div style={{display:'flex',alignItems:'center',gap:5,marginTop:2,flexWrap:'wrap'}}>
+                  {c.phone && <span style={{fontSize:10,color:'#6b7280',direction:'ltr'}}>{fmtPhone(c.phone)}</span>}
+                  {/* ספירת הזמנות */}
+                  <span style={{fontSize:10,fontWeight:700,
+                    background: isLoyal?'#ede9fe':'#f3f4f6',
+                    color: isLoyal?'#6d28d9':'#6b7280',
+                    borderRadius:4,padding:'1px 5px'}}>
+                    {c.count}×
+                  </span>
+                  {/* רצף */}
+                  {streakActive && (
+                    <span style={{fontSize:10,fontWeight:700,background:'#fef3c7',color:'#92400e',borderRadius:4,padding:'1px 5px'}}>
+                      🔥 {c.streak} ברצף
+                    </span>
+                  )}
+                  {c.streak===1 && c.count>1 && (
+                    <span style={{fontSize:10,color:'#9ca3af'}}>לא בשבוע הזה</span>
+                  )}
+                </div>
+              </div>
+
+              {/* כפתור וואטסאפ */}
+              {c.phone && (
+                <a href={waLink(c.phone)} target="_blank"
+                  style={{width:32,height:32,background:'#25d366',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:15,textDecoration:'none',flexShrink:0}}>💬</a>
+              )}
             </div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontWeight:700,fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name||'—'}</div>
-              {c.phone && <div style={{fontSize:11,color:'#6b7280',direction:'ltr'}}>{fmtPhone(c.phone)}</div>}
-            </div>
-            {c.phone && (
-              <a href={waLink(c.phone)} target="_blank"
-                style={{width:32,height:32,background:'#25d366',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:15,textDecoration:'none',flexShrink:0}}>💬</a>
-            )}
-          </div>
-        ))}
+          );
+        })}
         {filtered.length === 0 && <div style={{textAlign:'center',color:'#9ca3af',fontSize:13,padding:'16px 0'}}>לא נמצאו תוצאות</div>}
         <button onClick={copyAll} style={{...S.btn,marginTop:14,background:'#2d6a4f'}}>📋 העתק רשימה מלאה</button>
       </>)}
@@ -2158,7 +2282,7 @@ function MessagesTab({coord,week,pilot,driver,waGroupLink,justGraduated,pilotPas
     ? `🔥 *שברנו שיא השבוע!*\n\n${orderCount} הזמנות ו-₪${totalRev.toLocaleString('he-IL')} — יותר מכל שבוע עד עכשיו!\n\nתודה לכולם שהזמינו ושהמליצו 💚\nיחד אנחנו גדלים שבוע אחרי שבוע 🌿`
     : beatOrders
     ? `🔥 *שברנו שיא בהזמנות!*\n\n${orderCount} הזמנות השבוע — יותר מהשבוע שעבר (${lastWeek?.orders})!\n\nתודה לכולם שהזמינו ושהמליצו 💚\nיחד אנחנו גדלים שבוע אחרי שבוע 🌿`
-    : `🔥 *שברנו שיא בסכום!*\n\n₪${totalRev.toLocaleString('he-IL')} השבוע — יותר מהשבוע שעבר (₪${lastWeek?.revenue.toLocaleString('he-IL')})!\n\nתודה לכולם שהזמינו ושהמליצו 💚\nיחד אנחנו גדלים שבוע אחרי שבוע 🌿`;
+    : `🔥 *שברנו שיא בסכום!*\n\n₪${totalRev.toLocaleString('he-IL')} השבוע — יותר מהשבוע שעבר (₪${(lastWeek?.revenue||0).toLocaleString('he-IL')})!\n\nתודה לכולם שהזמינו ושהמליצו 💚\nיחד אנחנו גדלים שבוע אחרי שבוע 🌿`;
 
   const membersMsg = `🏆 *הגענו ל-${memberEntry?.count} חברים בקבוצה!*\n\nזה לא מובן מאליו — כל אחד ואחת מכם הוסיף חבר, שיתף לינק, המליץ לשכן.\n\nתודה שאתם חלק מהתנועה 🌿\n\nביחד אנחנו יוצרים משהו אמיתי 💚`;
 
@@ -2181,7 +2305,7 @@ function MessagesTab({coord,week,pilot,driver,waGroupLink,justGraduated,pilotPas
       {coord.orders.filter(o=>o.phone).slice(0,5).map((o,i)=>(
         <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #e8ede9"}}>
           <div style={{flex:1,fontSize:13,fontWeight:600}}>{o.name}</div>
-          <a href={waLink(o.phone, buildPersonalMsg(o,coord,time))} target="_blank"
+          <a href={waLink(o.phone, buildPersonalMsg(o,coord))} target="_blank"
             style={{background:"#25d366",color:"#fff",padding:"6px 12px",borderRadius:8,fontSize:12,fontWeight:700,textDecoration:"none"}}>💬 שלח</a>
         </div>
       ))}
@@ -2263,6 +2387,119 @@ const ADMIN_GUIDE_SECTIONS = [
     ]
   },
 ];
+
+// ══════════════════════════════════════════════
+// HISTORY TAB — browse & download past CSV snapshots
+// ══════════════════════════════════════════════
+function HistoryTab({showToast}) {
+  const [files, setFiles] = useState(null);   // null=loading, []=empty
+  const [uploading, setUploading] = useState(false);
+  const [uploadDate, setUploadDate] = useState('');
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadName, setUploadName] = useState('');
+
+  useEffect(() => { loadFiles(); }, []);
+
+  function loadFiles() {
+    setFiles(null);
+    fetch('/api/history').then(r=>r.json()).then(d=>setFiles(d.files||[])).catch(()=>setFiles([]));
+  }
+
+  function fmtDate(d) {
+    // d = "YYYY-MM-DD"
+    try {
+      const [y,m,day] = d.split('-');
+      return new Date(+y,+m-1,+day).toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'long',year:'numeric'});
+    } catch(e) { return d; }
+  }
+  function fmtSize(b) {
+    return b>1024 ? Math.round(b/1024)+' KB' : b+' B';
+  }
+
+  function handleFileInput(e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    setUploadFile(f);
+    setUploadName(f.name);
+    // try to parse date from filename like orders_2025-05-10.csv
+    const m = f.name.match(/(\d{4}-\d{2}-\d{2})/);
+    if (m) setUploadDate(m[1]);
+  }
+
+  async function doUpload() {
+    if (!uploadFile) { showToast('⚠️ בחר קובץ'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(uploadDate)) { showToast('⚠️ בחר תאריך תקין'); return; }
+    setUploading(true);
+    try {
+      const text = await uploadFile.text();
+      const r = await fetch(`/api/history/upload?date=${uploadDate}`, {
+        method:'POST', headers:{'Content-Type':'text/plain'}, body: text
+      });
+      const d = await r.json();
+      if (d.ok) { showToast('✅ הועלה: '+d.filename); setUploadFile(null); setUploadName(''); setUploadDate(''); loadFiles(); }
+      else showToast('❌ שגיאה: '+(d.error||'unknown'));
+    } catch(e) { showToast('❌ '+e.message); }
+    finally { setUploading(false); }
+  }
+
+  return <>
+    {/* ── Upload card ── */}
+    <Card>
+      <div style={{fontSize:13,fontWeight:900,color:'#1a3c2e',marginBottom:10,display:'flex',alignItems:'center',gap:6}}>
+        📂 העלאת CSV ידנית
+        <Tip text="אם יש לך קובץ CSV ישן מפופ שלא נשמר אוטומטית — העלה אותו כאן עם התאריך המתאים. הקובץ יישמר בארכיון."/>
+      </div>
+      <input type="file" id="hist_upload_input" accept=".csv" style={{display:'none'}} onChange={handleFileInput}/>
+      <button onClick={()=>document.getElementById('hist_upload_input').click()}
+        style={{...S.btn,background:'#eff6ff',color:'#1d4ed8',border:'1px solid #bfdbfe',marginBottom:8,width:'100%'}}>
+        📄 {uploadName || 'בחר קובץ CSV'}
+      </button>
+      {uploadName && <>
+        <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
+          <label style={{fontSize:11,color:'#6b7280',whiteSpace:'nowrap'}}>תאריך הנתונים:</label>
+          <input type="date" value={uploadDate} onChange={e=>setUploadDate(e.target.value)}
+            style={{...S.input,flex:1,fontSize:13,padding:'7px 10px'}}/>
+        </div>
+        <button onClick={doUpload} disabled={uploading}
+          style={{...S.btn,width:'100%',background:'#2d6a4f',opacity:uploading?0.6:1}}>
+          {uploading ? '⏳ מעלה...' : '💾 שמור בארכיון'}
+        </button>
+      </>}
+    </Card>
+
+    {/* ── File list ── */}
+    <Card>
+      <div style={{fontSize:13,fontWeight:900,color:'#1a3c2e',marginBottom:10,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <span style={{display:'flex',alignItems:'center',gap:6}}>
+          🕐 ארכיון שבועות קודמים
+          <Tip text="כל פעם ש-refresh.js רץ, הוא שומר snapshot של הנתונים. לחץ להורדה כדי לקבל קובץ CSV מוכן לניתוח."/>
+        </span>
+        <button onClick={loadFiles} style={{background:'none',border:'none',fontSize:16,cursor:'pointer',color:'#2d6a4f'}}>🔄</button>
+      </div>
+      {files===null && <div style={{textAlign:'center',color:'#9ca3af',padding:'20px 0',fontSize:13}}>⏳ טוען...</div>}
+      {files!==null && files.length===0 && (
+        <div style={{textAlign:'center',color:'#9ca3af',padding:'20px 0',fontSize:13}}>
+          <div style={{fontSize:28,marginBottom:6}}>🗂️</div>
+          אין עדיין snapshots שמורים.<br/>
+          <span style={{fontSize:11}}>הם יתחילו להיווצר אוטומטית בריצה הבאה של refresh.js</span>
+        </div>
+      )}
+      {files!==null && files.map(f=>(
+        <div key={f.filename} style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+          padding:'10px 12px',borderRadius:8,border:'1px solid #e5e7eb',marginBottom:6,background:'#fafafa'}}>
+          <div>
+            <div style={{fontSize:12,fontWeight:700,color:'#1a3c2e'}}>{fmtDate(f.date)}</div>
+            <div style={{fontSize:10,color:'#9ca3af',marginTop:2}}>{f.filename} · {fmtSize(f.size)}</div>
+          </div>
+          <a href={`/api/history/${f.filename}`} download={f.filename}
+            style={{...S.btn,textDecoration:'none',fontSize:11,padding:'6px 12px',background:'#f0fdf4',color:'#166534',border:'1px solid #bbf7d0'}}>
+            ⬇️ הורד
+          </a>
+        </div>
+      ))}
+    </Card>
+  </>;
+}
 
 function AdminGuide() {
   const [open, setOpen] = useState(null);
