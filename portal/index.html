@@ -63,6 +63,8 @@ const STORE_LINK_DEFAULT = "https://mypips.app/popisrael/private-sale/popolonski
 const STORE_LINK_WED     = "https://mypips.link/popisrael/p/wed-center";
 const CS_PHONE           = "0555049028";
 const RAVIT_PHONE        = "0503232991";
+const TOM_FARMER_PHONE   = "0586682644"; // תום — ממשק חקלאי פולונסקי
+const RECRUITER_PHONE    = "";           // ← הכנס טלפון המגייסת
 const GROUP_TARGET       = 60;
 
 function getStoreLink() {
@@ -2389,12 +2391,15 @@ function MessagesTab({coord,week,pilot,driver,waGroupLink,justGraduated,pilotPas
     {justGraduated&&!pilotPassed&&<CopyCard title="🙏 תודה על הנכונות" sub="שלח לקבוצה — סיום הפיילוט" color="#92400e" text={`תודה רבה לכל אחד מכם על הנכונות להיות חלק מהפיילוט שלנו 🙏\n\nזה לא מובן מאליו — ההשתתפות שלכם, ולו גם בצעד אחד, מאוד משמעותית לנו.\n\nנשמח לראות אתכם שוב בפופ ישראל בעתיד 🌿`} showToast={showToast}/>}
     {hitMemberTarget&&<CopyCard title={`🏆 הגענו ל-${memberEntry?.count} חברים!`} sub="שלח לקבוצה — אבן דרך" color="#7c3aed" text={membersMsg} showToast={showToast}/>}
     {beatLastWeek&&<CopyCard title="🔥 שברנו את השיא!" sub="שלח לקבוצה — מוטיבציה לשבוע הבא" color="#059669" text={beatMsg} showToast={showToast}/>}
+    {pilot?.status==="pilot"&&<CopyCard title={`🌱 הודעת פיילוט — שבוע ${pilot.week}/4`} sub="לפרסום לשכנים וחברים" color="#f4a261" text={buildPilotMsg(coord,waGroupLink)} showToast={showToast}/>}
     {msgs.slice(0,3).map((m,i)=>i===0&&isRegularCoord?<CommunityCard key={0} {...m} showToast={showToast}/>:<CopyCard key={i} {...m} showToast={showToast}/>)}
     <div style={{background:"#fffbeb",border:"1.5px solid #fcd34d",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
-      <div style={{display:'flex',alignItems:'center',marginBottom:6}}><p style={{fontSize:12,fontWeight:800,color:"#92400e",margin:0}}>📞 למי פונים?</p><Tip text="שירות לקוחות: בעיות הזמנה ותשלום · רווית: נהג / עיכוב / לוגיסטיקה בלבד. בעיות כלליות → שירות לקוחות."/></div>
-      <div style={{fontSize:12,color:"#78350f",lineHeight:1.7}}>
-        <div>💬 <strong>שירות לקוחות</strong> — בעיות הזמנה, תשלום, איכות<br/><span style={{opacity:.75,paddingRight:20}}>התכתבות וואטסאפ בלבד · {fmtPhone(CS_PHONE)}</span></div>
-        <div style={{marginTop:6}}>🚐 <strong>רווית</strong> — נהג / עיכוב / תיאום מיוחד<br/><span style={{opacity:.75,paddingRight:20}}>{fmtPhone(RAVIT_PHONE)}</span></div>
+      <p style={{fontSize:12,fontWeight:800,color:"#92400e",margin:"0 0 6px"}}>📞 למי פונים?</p>
+      <div style={{fontSize:12,color:"#78350f",lineHeight:1.9}}>
+        <div>💬 <strong>שירות לקוחות</strong> — בעיות הזמנה, תשלום, איכות<br/><span style={{opacity:.75,paddingRight:20}}>וואטסאפ בלבד · {fmtPhone(CS_PHONE)}</span></div>
+        <div>🚐 <strong>רווית</strong> — נהג / עיכוב / תיאום<br/><span style={{opacity:.75,paddingRight:20}}>{fmtPhone(RAVIT_PHONE)}</span></div>
+        <div>🌿 <strong>תום</strong> — ממשק חקלאי פולונסקי<br/><span style={{opacity:.75,paddingRight:20}}>{fmtPhone(TOM_FARMER_PHONE)}</span></div>
+        {RECRUITER_PHONE&&<div>🤝 <strong>מגייסת</strong><br/><span style={{opacity:.75,paddingRight:20}}>{fmtPhone(RECRUITER_PHONE)}</span></div>}
       </div>
     </div>
     {msgs.slice(2).map((m,i)=><CopyCard key={i+2} {...m} showToast={showToast}/>)}
@@ -2681,9 +2686,8 @@ const COORD_GUIDE_SECTIONS = [
   {
     id:"messages-guide", icon:"📤", title:"הודעות מוכנות",
     items:[
-      {h:"מה יש בלשונית הודעות?", b:"הודעות מוכנות לשבוע הנוכחי: פתיחת שבוע, תזכורת אחרון, אחרי חלוקה ועוד."},
-      {h:"הודעת פיילוט", b:"בזמן הפיילוט (4 שבועות ראשונים) — תמצאי הודעה מוכנה לגיוס שכנים. העתיקי ושלחי לחברים ובקבוצות שייכות."},
-      {h:"טיפ", b:"כדאי לשלוח הודעת פתיחה ביום ראשון בערב ותזכורת ביום רביעי."},
+      {h:"מה יש בלשונית הודעות?", b:"• הודעת פתיחת חנות (לפרסום בקבוצה)\n• 🌱 הודעת פיילוט — רק למי שבפיילוט, לגיוס שכנים חדשים\n• 🌱 גיוס קהילה + תמונה — רק לנקודות קבועות\n• לינק החנות\n• תיבת 'למי פונים?' — שירות לקוחות, רווית, תום, מגייסת"},
+      {h:"הודעת פיילוט", b:"מופיעה רק בזמן הפיילוט (4 שבועות ראשונים). העתיקי ושלחי לחברים ובקבוצות שייכות לגיוס שכנים."},
     ]
   },
   {
@@ -2698,8 +2702,7 @@ const COORD_GUIDE_SECTIONS = [
     id:"reminders-guide", icon:"🔔", title:"תזכורות",
     items:[
       {h:"תזכורות פעילות", b:"תזכורות אוטומטיות לפי שלב השבוע מופיעות בראש לשונית 🔔."},
-      {h:"אפשור נוטיפיקציות", b:"לחץ 'אפשר תזכורות' ואשר בדפדפן. תקבל עדכון כשהחנות נפתחת/נסגרת."},
-      {h:"הודעת פיילוט", b:"בתקופת הפיילוט — הודעה מוכנה לגיוס חברים חדשים זמינה בלשונית זו."},
+      {h:"אפשור נוטיפיקציות", b:"לחץ 'אפשר תזכורות' ואשר בדפדפן. תקבל התראה כשהאפליקציה מזהה שאת/ה מתחת למינימום השבועי."},
     ]
   },
 ];
@@ -2761,13 +2764,7 @@ function RemindersTab({coord,pilot,activeReminders,waGroupLink,history,showToast
     ))}
     <Card style={{borderRight:"4px solid #2d6a4f"}}>
       <p style={{...T.cardTitle,marginBottom:4}}>🔔 תזכורות בדפדפן</p>
-      <p style={{fontSize:12,color:"#6b7280",marginBottom:10,lineHeight:1.6}}>תזכורות שמופיעות על המסך של הטלפון/מחשב הזה בזמנים הנכונים:</p>
-      <div style={{fontSize:12,color:"#374151",lineHeight:1.9,marginBottom:10}}>
-        <div>🗓️ <strong>חמישי–שבת</strong> — הזמן משתתפים חדשים לפני פתיחת החנות</div>
-        <div>🧺 <strong>שני בבוקר</strong> — הזמן סל רכז לפני 14:00</div>
-        <div>🚗 <strong>יום החלוקה בבוקר</strong> — מלא שעת הגעת הנהג</div>
-        {pilot?.status==="pilot"&&<div>💬 <strong>שבוע 2 בפיילוט</strong> — שתף משוב על הסחורה</div>}
-      </div>
+      <p style={{fontSize:12,color:"#6b7280",marginBottom:10,lineHeight:1.6}}>התראה שתופיע על המסך כש<strong>לא עמדת ביעד</strong> — פותחים את האפליקציה ורואים שמתחת למינימום. לחץ "אפשר" כדי שהדפדפן יוכל להציג את ההתראה.</p>
       {!notifGranted
         ?<button style={S.btn} onClick={requestNotif}>🔔 אפשר תזכורות</button>
         :<div style={{display:"flex",gap:8}}>
@@ -2775,20 +2772,6 @@ function RemindersTab({coord,pilot,activeReminders,waGroupLink,history,showToast
         </div>}
       {notifGranted&&<p style={{fontSize:11,color:"#16a34a",marginTop:10,textAlign:"center"}}>✅ תזכורות פעילות על המכשיר הזה</p>}
     </Card>
-    {pilot?.status==="pilot" && (
-      <Card style={{borderRight:"4px solid #f4a261"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-          <div><p style={{...T.cardTitle,marginBottom:2}}>🌱 הודעת פיילוט — שבוע {pilot.week}/4</p><p style={{fontSize:11,color:"#6b7280"}}>לפרסום לשכנים וחברים</p></div>
-          <CopyBtnSimple text={pilotMsg} label="📋 העתק"/>
-        </div>
-        <div style={{background:"#fffbf0",border:"1px solid #fde68a",borderRadius:10,padding:"12px",fontSize:12,color:"#374151",whiteSpace:"pre-wrap",lineHeight:1.7,maxHeight:220,overflowY:"auto",direction:"rtl"}}>
-          {pilotMsg}
-        </div>
-        {waGroupLink&&<a href={waGroupLink} target="_blank" style={{display:"block",marginTop:10,background:"#25d366",color:"#fff",padding:"10px",borderRadius:10,textAlign:"center",textDecoration:"none",fontWeight:700,fontSize:13}}>
-          💬 פתח קבוצת וואטסאפ
-        </a>}
-      </Card>
-    )}
     {history?.length > 0 && (
       <Card style={{borderRight:"4px solid #52b788"}}>
         <p style={{...T.cardTitle,marginBottom:12}}>📊 היסטוריית הזמנות</p>
