@@ -1,30 +1,170 @@
 [
-    { "coordKey": "טל",                       "coordName": "טל",                  "city": "בית יצחק",                   "launchDate": "1.1.26" },
-    { "coordKey": "נעמה",                      "coordName": "נעמה",                 "city": "כפר חיים,",                  "launchDate": "1.1.26" },
-    { "coordKey": "בילי",                      "coordName": "בילי",                 "city": "הרצליה",                     "launchDate": "1.1.26" },
-    { "coordKey": "Sivan-Cohen-Gvili",         "coordName": "סיון כהן",             "city": "העוגן",                      "launchDate": "1.1.26" },
-    { "coordKey": "אורטל",                     "coordName": "אורטל",                "city": "יקום",                       "launchDate": "1.1.26" },
-    { "coordKey": "מורן",                      "coordName": "מורן",                 "city": "חיבת ציון",                  "launchDate": "1.1.26" },
-    { "coordKey": "טליה-ישראלי",               "coordName": "טליה ישראלי",          "city": "שורשים",                     "launchDate": "1.1.26" },
-    { "coordKey": "ורד-בן-בסה",                "coordName": "ורד בן בסה",           "city": "מסילת ציון",                 "launchDate": "1.1.26" },
-    { "coordKey": "מירי-ליסק",                 "coordName": "מירי ליסק",            "city": "אלוני אבא",                  "launchDate": "1.1.26" },
-    { "coordKey": "הודיה-נובחוב",              "coordName": "הודיה נובחוב",          "city": "זכרון יעקב",                 "launchDate": "1.1.26" },
-    { "coordKey": "אירן-דיכנו",                "coordName": "אירן דיכנו",           "city": "תל אביב השופטים",            "launchDate": "1.1.26" },
-    { "coordKey": "רוני-שפי",                  "coordName": "רוני שפי",             "city": "הרצליה",                     "launchDate": "1.1.26" },
-    { "coordKey": "אמילי-כהן",                 "coordName": "אמילי כהן",            "city": "גבעת חיים מאוחד",            "launchDate": "1.1.26" },
-    { "coordKey": "שקד-נוימן",                 "coordName": "שקד נוימן",            "city": "זכרון יעקב",                 "launchDate": "1.1.26" },
-    { "coordKey": "רביד-אטיא",                 "coordName": "רביד אטיא",            "city": "קרית אונו",                  "launchDate": "1.1.26" },
-    { "coordKey": "אוסנת",                     "coordName": "אוסנת",                "city": "טבעון",                      "launchDate": "1.1.26" },
-    { "coordKey": "מיטל-כהן",                  "coordName": "מיטל כהן",             "city": "נתניה",                      "launchDate": "1.1.26" },
-    { "coordKey": "מירב-סארמילי",              "coordName": "מירב סארמילי",          "city": "כרמיאל",                     "launchDate": "1.1.26" },
-    { "coordKey": "מאיה",                      "coordName": "מאיה",                 "city": "מודיעין",                    "launchDate": "12.4.26" },
-    { "coordKey": "אדם-פליישמן",               "coordName": "אדם פליישמן",          "city": "מתחם מיקסר (קמפוס אמדוקס)", "launchDate": "12.4.26" },
-    { "coordKey": "חנה-פיסינגר",               "coordName": "חנה פיסינגר",          "city": "אבן יהודה",                  "launchDate": "1.1.26" },
-    { "coordKey": "כנרת-דן-מטפלת-רגשית",       "coordName": "כנרת דן מטפלת רגשית", "city": "רמת גן",                     "launchDate": "26.4.26" },
-    { "coordKey": "מיכה-לויט",                 "coordName": "מיכה לויט",            "city": "תל אביב סוטין",              "launchDate": "26.4.26" },
-    { "coordKey": "אליזבת'-גולדברג", "coordName": "אליזבת' גולדברג", "city": "תל אביב תל כביר", "launchDate": "26.4.26" },
-    { "coordKey": "ליבי",                      "coordName": "ליבי",                 "city": "תלמז",                       "launchDate": "3.5.26" },
-    { "coordKey": "מעיין-בל-אטד",              "coordName": "מעיין בל אטד",         "city": "גן יבנה",                    "launchDate": "10.5.26" },
-    { "coordKey": "Miryam-Caspi",             "coordName": "Miryam Caspi",         "city": "בית גמליאל",                 "launchDate": "10.5.26" },
-    { "coordKey": "רחלי",                     "coordName": "רחלי",                 "city": "אביחיל",                     "launchDate": "1.1.26" }
+  {
+    "coordKey": "טל",
+    "coordName": "טל",
+    "city": "בית יצחק",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "נעמה",
+    "coordName": "נעמה",
+    "city": "כפר חיים,",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "בילי",
+    "coordName": "בילי",
+    "city": "הרצליה",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "סיון-כהן-גבילי",
+    "coordName": "סיון כהן",
+    "city": "העוגן",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "אורטל",
+    "coordName": "אורטל",
+    "city": "יקום",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "מורן",
+    "coordName": "מורן",
+    "city": "חיבת ציון",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "טליה-ישראלי",
+    "coordName": "טליה ישראלי",
+    "city": "שורשים",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "ורד-בן-בסה",
+    "coordName": "ורד בן בסה",
+    "city": "מסילת ציון",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "מירי-ליסק",
+    "coordName": "מירי ליסק",
+    "city": "אלוני אבא",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "הודיה-נובחוב",
+    "coordName": "הודיה נובחוב",
+    "city": "זכרון יעקב",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "אירן-דיכנו",
+    "coordName": "אירן דיכנו",
+    "city": "תל אביב השופטים",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "רוני-שפי",
+    "coordName": "רוני שפי",
+    "city": "הרצליה",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "אמילי-כהן",
+    "coordName": "אמילי כהן",
+    "city": "גבעת חיים מאוחד",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "שקד-נוימן",
+    "coordName": "שקד נוימן",
+    "city": "זכרון יעקב",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "רביד-אטיא",
+    "coordName": "רביד אטיא",
+    "city": "קרית אונו",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "אוסנת",
+    "coordName": "אוסנת",
+    "city": "טבעון",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "מיטל-כהן",
+    "coordName": "מיטל כהן",
+    "city": "נתניה",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "מירב-סארמילי",
+    "coordName": "מירב סארמילי",
+    "city": "כרמיאל",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "מאיה",
+    "coordName": "מאיה",
+    "city": "מודיעין",
+    "launchDate": "12.4.26"
+  },
+  {
+    "coordKey": "אדם-פליישמן",
+    "coordName": "אדם פליישמן",
+    "city": "מתחם מיקסר (קמפוס אמדוקס)",
+    "launchDate": "12.4.26"
+  },
+  {
+    "coordKey": "חנה-פיסינגר",
+    "coordName": "חנה פיסינגר",
+    "city": "אבן יהודה",
+    "launchDate": "1.1.26"
+  },
+  {
+    "coordKey": "כנרת-דן-מטפלת-רגשית",
+    "coordName": "כנרת דן מטפלת רגשית",
+    "city": "רמת גן",
+    "launchDate": "26.4.26"
+  },
+  {
+    "coordKey": "מיכה-לויט",
+    "coordName": "מיכה לויט",
+    "city": "תל אביב סוטין",
+    "launchDate": "26.4.26"
+  },
+  {
+    "coordKey": "אליזבת'-גולדברג",
+    "coordName": "אליזבת' גולדברג",
+    "city": "תל אביב תל כביר",
+    "launchDate": "26.4.26"
+  },
+  {
+    "coordKey": "ליבי",
+    "coordName": "ליבי",
+    "city": "תלמז",
+    "launchDate": "3.5.26"
+  },
+  {
+    "coordKey": "מעיין-בל-אטד",
+    "coordName": "מעיין בל אטד",
+    "city": "גן יבנה",
+    "launchDate": "10.5.26"
+  },
+  {
+    "coordKey": "מרים-כספי",
+    "coordName": "מרים כספי",
+    "city": "בית גמליאל",
+    "launchDate": "10.5.26"
+  },
+  {
+    "coordKey": "רחלי",
+    "coordName": "רחלי",
+    "city": "אביחיל",
+    "launchDate": "1.1.26"
+  }
 ]

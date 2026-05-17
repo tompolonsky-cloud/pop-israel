@@ -54,6 +54,25 @@ if (fs.existsSync(SETTINGS_FILE)) {
   try { settings = { ...settings, ...JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8')) }; } catch(e) {}
 }
 
+// מיגרציה חד-פעמית: שנה מפתחות לטיניים ל-עברית בהיסטוריה ובהגדרות
+(()=>{
+  const historyKeys = ['coordHistory','allTimeCustomers','drivers','waLinks','times'];
+  let changed = false;
+  for (const field of historyKeys) {
+    if (!settings[field] || typeof settings[field] !== 'object') continue;
+    const renamed = {};
+    for (const [k, v] of Object.entries(settings[field])) {
+      const a = COORD_ALIASES[k];
+      if (a) { renamed[a.coordKey] = v; changed = true; }
+      else renamed[k] = v;
+    }
+    if (changed) settings[field] = renamed;
+  }
+  if (changed) {
+    try { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2)); console.log('🔄 מיגרציה: מפתחות רכזים עודכנו לעברית'); } catch(e) {}
+  }
+})();
+
 // ── GET /api/data — portal reads this on startup
 app.get('/api/data', (req, res) => {
   if (fs.existsSync(COORD_FILE)) {
@@ -74,6 +93,16 @@ app.post('/api/settings', (req, res) => {
   console.log(`⚙️  הגדרות עודכנו`);
   res.json({ ok: true });
 });
+
+// תרגום שמות לטיניים → עברית (coordKey + coordName)
+const COORD_ALIASES = {
+  'Miryam-Caspi':      { coordKey: 'מרים-כספי',       coordName: 'מרים כספי' },
+  'Sivan-Cohen-Gvili': { coordKey: 'סיון-כהן-גבילי',  coordName: 'סיון כהן' },
+};
+function applyAlias(c) {
+  const a = COORD_ALIASES[c.coordKey];
+  return a ? { ...c, ...a } : c;
+}
 
 // רכזים שהוסרו ידנית — לא יחזרו גם אם הגיליון מכיל אותם
 const COORD_BLOCKLIST = new Set([
@@ -98,7 +127,8 @@ const LAUNCH_DATES = {
   'כנרת-דן-מטפלת-רגשית': '26.4.26', 'מיכה-לויט': '26.4.26',
   "אליזבת'-גולדברג": '26.4.26',
   'ליבי': '3.5.26', 'מור-אשל': '3.5.26',
-  'מעיין-בל-אטד': '10.5.26', 'Miryam-Caspi': '10.5.26',
+  'מעיין-בל-אטד': '10.5.26', 'Miryam-Caspi': '10.5.26', 'מרים-כספי': '10.5.26',
+  'Sivan-Cohen-Gvili': '1.1.26', 'סיון-כהן-גבילי': '1.1.26',
   'רחלי': '1.1.26',
   // מור-אשל הוסרה מהמערכת
 };
@@ -108,7 +138,8 @@ app.post('/api/coordinators', (req, res) => {
   const raw = Array.isArray(req.body) ? req.body : null;
   if (!raw) return res.status(400).json({ error: 'invalid' });
   const list = [...raw.filter(c => !COORD_BLOCKLIST.has(c.coordKey)), ...COORD_MANUAL]
-    .map(c => LAUNCH_DATES[c.coordKey] ? { ...c, launchDate: LAUNCH_DATES[c.coordKey] } : c);
+    .map(c => LAUNCH_DATES[c.coordKey] ? { ...c, launchDate: LAUNCH_DATES[c.coordKey] } : c)
+    .map(applyAlias);
   coordList = list;
   fs.writeFileSync(COORD_FILE, JSON.stringify(list, null, 2));
   console.log(`📋 רכזים עודכנו — ${list.length} פעילות`);
@@ -445,6 +476,7 @@ function parseCSV(text) {
 
   return Object.entries(byD).map(([key, orders]) => {
     const p = parseDelivery(key);
-    return { ...p, coordKey: slugify(p.coordName || p.city || key), deliveryStr: key, orders };
+    const raw = { ...p, coordKey: slugify(p.coordName || p.city || key), deliveryStr: key, orders };
+    return applyAlias(raw);
   });
 }
