@@ -890,11 +890,10 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
                     </div>
                     <div style={{fontSize:11,color:'#6b7280',display:'flex',alignItems:'center',gap:5}}>
                       <span>{c.city}</span>
-                      {grpLink&&<a href={grpLink} target="_blank" rel="noopener noreferrer"
-                          onClick={e=>e.stopPropagation()}
-                          style={{color:'#16a34a',textDecoration:'none',fontWeight:600,fontSize:10}}>
+                      {grpLink&&<button onClick={e=>{e.stopPropagation();window.open(grpLink,'_blank');}}
+                          style={{background:'none',border:'none',color:'#16a34a',fontWeight:600,fontSize:10,cursor:'pointer',padding:0}}>
                           🌐 {grpName||'קבוצה'}
-                        </a>}
+                        </button>}
                     </div>
                   </div>
                   <div style={{textAlign:'center',minWidth:60,flexShrink:0}}>
@@ -973,11 +972,13 @@ function AdminScreen({coords,times,drivers,waLinks,week,notifs,progress,updatedA
                     </div>
                     <button style={S.iconBtn} onClick={()=>onCoordLink(c)}>📋</button>
                     <button style={{...S.iconBtn,background:"#dcfce7"}} onClick={()=>onCoordWA(c)}>💬</button>
-                    {grpLink
-                      ? <a href={grpLink} target="_blank" rel="noopener noreferrer"
-                          style={{...S.iconBtn,background:"#d1fae5",textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>🌐</a>
-                      : <button style={{...S.iconBtn,background:"#f3f4f6",color:"#9ca3af",cursor:"default"}} disabled>🌐</button>
-                    }
+                    {(()=>{
+                      const ph=c.coordPhone||coordPhones[c.coordKey]||'';
+                      const link=grpLink||(ph?`https://wa.me/${ph.replace(/^0/,'972')}`:null);
+                      return link
+                        ? <button onClick={()=>window.open(link,'_blank')} style={{...S.iconBtn,background:"#d1fae5"}}>🌐</button>
+                        : <button style={{...S.iconBtn,background:"#f3f4f6",color:"#9ca3af",cursor:"default"}} disabled>🌐</button>;
+                    })()}
                     <button style={{...S.iconBtn,background:"#dbeafe"}} onClick={()=>onOpenCoord(c)}>👁️</button>
                     <button style={{...S.iconBtn,background:"#fef3c7"}} onClick={()=>onFireNotif(c)}>🔔</button>
                   </div>
