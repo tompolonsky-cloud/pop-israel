@@ -1,5 +1,6 @@
-const CACHE = 'pop-v29';
-const PRECACHE = ['/', '/manifest.json', '/icon.svg'];
+const CACHE = 'pop-v30';
+// לא מקאשים את index.html — תמיד טוענים מהשרת כדי שעדכונים ייכנסו מיד
+const PRECACHE = ['/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -17,6 +18,8 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.url.includes('/api/')) return;
+  // HTML (ניווט) — תמיד מהרשת, לא מהקאש
+  if (e.request.mode === 'navigate') return;
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).then(res => {
       if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
