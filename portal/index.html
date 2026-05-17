@@ -2321,7 +2321,7 @@ function MessagesTab({coord,week,pilot,driver,waGroupLink,justGraduated,pilotPas
     {justGraduated&&!pilotPassed&&<CopyCard title="🙏 תודה על הנכונות" sub="שלח לקבוצה — סיום הפיילוט" color="#92400e" text={`תודה רבה לכל אחד מכם על הנכונות להיות חלק מהפיילוט שלנו 🙏\n\nזה לא מובן מאליו — ההשתתפות שלכם, ולו גם בצעד אחד, מאוד משמעותית לנו.\n\nנשמח לראות אתכם שוב בפופ ישראל בעתיד 🌿`} showToast={showToast}/>}
     {hitMemberTarget&&<CopyCard title={`🏆 הגענו ל-${memberEntry?.count} חברים!`} sub="שלח לקבוצה — אבן דרך" color="#7c3aed" text={membersMsg} showToast={showToast}/>}
     {beatLastWeek&&<CopyCard title="🔥 שברנו את השיא!" sub="שלח לקבוצה — מוטיבציה לשבוע הבא" color="#059669" text={beatMsg} showToast={showToast}/>}
-    {msgs.slice(0,3).map((m,i)=><CopyCard key={i} {...m} showToast={showToast}/>)}
+    {msgs.slice(0,3).map((m,i)=>i===0&&isRegularCoord?<CommunityCard key={0} {...m} showToast={showToast}/>:<CopyCard key={i} {...m} showToast={showToast}/>)}
     <div style={{background:"#fffbeb",border:"1.5px solid #fcd34d",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
       <div style={{display:'flex',alignItems:'center',marginBottom:6}}><p style={{fontSize:12,fontWeight:800,color:"#92400e",margin:0}}>📞 למי פונים?</p><Tip text="שירות לקוחות: בעיות הזמנה ותשלום · רווית: נהג / עיכוב / לוגיסטיקה בלבד. בעיות כלליות → שירות לקוחות."/></div>
       <div style={{fontSize:12,color:"#78350f",lineHeight:1.7}}>
@@ -2357,6 +2357,49 @@ function CopyCard({title,sub,color,text,showToast}) {
       <div style={{background:"#f9fafb",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#374151",whiteSpace:"pre-wrap",direction:"rtl",lineHeight:1.6,maxHeight:90,overflow:"hidden"}}>
         {text.length>180?text.slice(0,180)+"…":text}
       </div>
+    </div>
+  );
+}
+
+function CommunityCard({title,sub,color,text,showToast}) {
+  const [copied,setCopied]=useState(false);
+  const [sharing,setSharing]=useState(false);
+  function copy(){navigator.clipboard.writeText(text).then(()=>{setCopied(true);showToast("✅ הועתק!");setTimeout(()=>setCopied(false),2500);});}
+  async function shareWithImage(){
+    setSharing(true);
+    try {
+      const res=await fetch('/pop-community.jpg');
+      const blob=await res.blob();
+      const file=new File([blob],'pop-community.jpg',{type:'image/jpeg'});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){
+        await navigator.share({files:[file],text});
+        showToast("✅ שותף!");
+      } else if(navigator.share){
+        await navigator.share({text});
+        showToast("✅ שותף!");
+      } else {
+        await navigator.clipboard.writeText(text);
+        const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='pop-community.jpg';a.click();
+        showToast("✅ הטקסט הועתק והתמונה הורדה!");
+      }
+    } catch(e){if(e.name!=='AbortError')showToast("❌ שגיאה בשיתוף");}
+    setSharing(false);
+  }
+  return (
+    <div style={{...S.card,borderRight:`4px solid ${color}`}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+        <div><div style={{fontSize:14,fontWeight:800,color:"#1a3c2e"}}>{title}</div><div style={{fontSize:11,color:"#6b7280"}}>{sub}</div></div>
+        <button onClick={copy} style={{background:copied?"#16a34a":color,color:"#fff",border:"none",padding:"7px 14px",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",transition:"background .3s",flexShrink:0}}>
+          {copied?"✅ הועתק":"📋 העתק"}
+        </button>
+      </div>
+      <img src="/pop-community.jpg" alt="פופ ישראל" style={{width:"100%",borderRadius:8,marginBottom:8,display:"block",objectFit:"cover",maxHeight:180}}/>
+      <div style={{background:"#f9fafb",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#374151",whiteSpace:"pre-wrap",direction:"rtl",lineHeight:1.6,maxHeight:90,overflow:"hidden",marginBottom:8}}>
+        {text.length>180?text.slice(0,180)+"…":text}
+      </div>
+      <button onClick={shareWithImage} disabled={sharing} style={{width:"100%",background:sharing?"#9ca3af":"#128C7E",color:"#fff",border:"none",padding:"9px",borderRadius:8,fontSize:13,fontWeight:700,cursor:sharing?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+        {sharing?"⏳ שולח...":"📤 שתף עם תמונה (וואטסאפ)"}
+      </button>
     </div>
   );
 }
